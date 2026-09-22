@@ -12,6 +12,7 @@ import (
 	"github.com/corollad/cowrite/internal/config"
 	"github.com/corollad/cowrite/internal/history"
 	"github.com/corollad/cowrite/internal/index"
+	"github.com/corollad/cowrite/internal/publish/bridge"
 	"github.com/corollad/cowrite/internal/render"
 	"github.com/corollad/cowrite/internal/secret"
 	"github.com/corollad/cowrite/internal/store"
@@ -35,6 +36,7 @@ type Server struct {
 	jobs     *jobRegistry
 	history  *history.History
 	events   *eventBus
+	bridge   *bridge.Bridge
 }
 
 func New(cfg config.Config, ws *workspace.Workspace, db *store.DB, ix *index.Index, log *slog.Logger) *Server {
@@ -45,6 +47,7 @@ func New(cfg config.Config, ws *workspace.Workspace, db *store.DB, ix *index.Ind
 		jobs:     newJobRegistry(),
 		history:  history.New(filepath.Join(cfg.Workspace, ".cowrite"), db),
 		events:   newEventBus(),
+		bridge:   bridge.New(),
 	}
 }
 
@@ -60,6 +63,7 @@ func (s *Server) Handler() http.Handler {
 		r.Post("/posts/{id}/versions", s.handleSnapshot)
 		r.Get("/posts/{id}/publishes", s.handleListPublishRecords)
 		r.Post("/posts/{id}/publish/wechat", s.handlePublishWeChat)
+		r.Post("/posts/{id}/publish/extension", s.handlePublishExtension)
 		r.Get("/posts/{id}/versions/{versionId}", s.handleGetVersion)
 		r.Post("/posts/{id}/versions/{versionId}/restore", s.handleRestoreVersion)
 		r.Put("/posts/{id}", s.handleUpdatePost)
@@ -79,6 +83,7 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/config", s.handleGetPublishConfig)
 			r.Put("/config", s.handleSavePublishConfig)
 			r.Post("/wechat/validate", s.handleValidateWeChat)
+			r.Get("/bridge", s.handleBridgeStatus)
 		})
 		r.Route("/voice", func(r chi.Router) {
 			r.Get("/config", s.handleGetVoiceConfig)
@@ -90,6 +95,10 @@ func (s *Server) Handler() http.Handler {
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		})
 	})
+
+	// The extension connects here; the handler checks its origin and a
+	// pairing token before accepting anything.
+	r.Get("/api/bridge", s.bridge.Handler())
 
 	r.Handle("/*", s.staticHandler())
 	return r

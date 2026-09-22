@@ -244,6 +244,20 @@
         <code>cover: 文件名.png</code>，图片放在文章同一个目录下。
       </div>
       <div id="pubRecords"></div>
+      <hr style="border:0;border-top:1px solid var(--border);margin:6px 0">
+      <h2 style="font-size:14px;margin:0">其他平台（通过浏览器扩展）</h2>
+      <div class="dlg-note" id="bridgeState">检查扩展连接…</div>
+      <div id="bridgePlatforms" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <details>
+        <summary style="font-size:12px;color:var(--muted);cursor:pointer">配对码与安装说明</summary>
+        <div class="dlg-note">
+          1. Chrome 打开 <code>chrome://extensions</code>，开启「开发者模式」<br>
+          2. 「加载已解压的扩展程序」，选 cowrite 项目里的 <code>extension/</code> 目录<br>
+          3. 点扩展图标，填端口和下面这串配对码：
+          <input id="bridgeToken" readonly style="margin-top:6px;font-family:ui-monospace">
+          <br>配对码只在本机有效，用来阻止任意网页连上这个服务。
+        </div>
+      </details>
       <div class="dlg-actions">
         <button id="pubSave" type="button">保存配置</button>
         <button id="pubTest" type="button">测试连接</button>
@@ -908,11 +922,16 @@ async function loadPublish() {
   wxSecret.placeholder = r.wechat.hasSecret ? '已保存，留空则不修改' : '粘贴 AppSecret';
 
   if (!current) { pubRecords.innerHTML = ''; return; }
+  await loadBridge();
+
   const recs = await api('GET', `/posts/${current.id}/publishes`);
+  const PLATFORM_LABEL = { wechat: '公众号', zhihu: '知乎', juejin: '掘金' };
+  const STATUS_LABEL = { draft: '已进草稿箱', filled: '已填进编辑器', failed: '失败' };
   pubRecords.innerHTML = recs.length
-    ? '<div class="dlg-note">最近发布：' + recs.slice(0, 3).map(x =>
+    ? '<div class="dlg-note">最近发布：<br>' + recs.slice(0, 4).map(x =>
         `${new Date(x.createdAt * 1000).toLocaleString('zh-CN')} · ` +
-        (x.status === 'failed' ? '失败' : '已进草稿箱')).join('<br>') + '</div>'
+        `${PLATFORM_LABEL[x.platform] || x.platform} · ` +
+        `${STATUS_LABEL[x.status] || x.status}`).join('<br>') + '</div>'
     : '';
 }
 
@@ -922,6 +941,42 @@ $('#pub').onclick = async () => {
   await loadPublish();
   pubDlg.showModal();
 };
+
+async function loadBridge() {
+  const b = await api('GET', '/publish/bridge');
+  $('#bridgeToken').value = b.token;
+
+  const state = $('#bridgeState');
+  state.textContent = b.connected
+    ? '扩展已连接。文章会填进平台编辑器，最后一步由你自己点发布。'
+    : '扩展未连接。装好扩展并填入配对码后，这里会变成已连接。';
+  state.style.color = b.connected ? '' : 'var(--accent)';
+
+  const box = $('#bridgePlatforms');
+  box.innerHTML = '';
+  for (const p of b.platforms) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = '填到' + p.name;
+    btn.disabled = !b.connected;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      btn.textContent = '发送中…';
+      try {
+        await api('POST', `/posts/${current.id}/publish/extension`,
+          { platform: p.id, theme });
+        toast(`已填进${p.name}编辑器，检查后自己点发布`);
+        await loadPublish();
+      } catch (err) {
+        toast(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '填到' + p.name;
+      }
+    };
+    box.append(btn);
+  }
+}
 
 $('#pubClose').onclick = () => pubDlg.close();
 
