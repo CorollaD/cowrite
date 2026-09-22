@@ -40,6 +40,26 @@ func (s *Server) handleRender(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, res)
 }
 
+type toMarkdownRequest struct {
+	HTML string `json:"html"`
+}
+
+// handleToMarkdown converts rich-text edits back to markdown, so the file
+// on disk stays markdown whichever mode the author used.
+func (s *Server) handleToMarkdown(w http.ResponseWriter, r *http.Request) {
+	var req toMarkdownRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.fail(w, http.StatusBadRequest, "invalid request body", err)
+		return
+	}
+	md, err := render.ToMarkdown(req.HTML)
+	if err != nil {
+		s.fail(w, http.StatusInternalServerError, "convert to markdown", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"markdown": md})
+}
+
 func (s *Server) handleListThemes(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, render.Themes())
 }

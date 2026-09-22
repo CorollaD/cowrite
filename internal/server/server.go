@@ -72,6 +72,7 @@ func (s *Server) Handler() http.Handler {
 		r.Delete("/posts/{id}", s.handleDeletePost)
 		r.Get("/events", s.handleEvents)
 		r.Post("/render", s.handleRender)
+		r.Post("/to-markdown", s.handleToMarkdown)
 		r.Route("/ai", func(r chi.Router) {
 			r.Get("/config", s.handleGetAIConfig)
 			r.Put("/config", s.handleSaveAIConfig)
@@ -93,6 +94,8 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/transcribe", s.handleTranscribe)
 		})
 		r.Get("/themes", s.handleListThemes)
+		r.Get("/sounds", s.handleListSounds)
+		r.Get("/sounds/{name}", s.handleGetSound)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		})

@@ -7,12 +7,39 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E%E2%9C%8E%3C/text%3E%3C/svg%3E">
 
 <style>
-  :root {
+  /* Writing backgrounds. Paper is the default; the rest are chosen for
+     long sessions, so contrast stays moderate rather than maximal. */
+  :root, :root[data-skin="paper"] {
     --bg: #fbfbfa; --panel: #fff; --border: #e6e4e1;
     --text: #23211e; --muted: #86817a; --accent: #c2410c;
   }
+  :root[data-skin="sepia"] {
+    --bg: #f4ecd8; --panel: #fbf5e6; --border: #e0d4b8;
+    --text: #3c2f1e; --muted: #8a7756; --accent: #a8541b;
+  }
+  :root[data-skin="mint"] {
+    --bg: #eef4ef; --panel: #f9fcfa; --border: #d3e2d7;
+    --text: #1f2e24; --muted: #6d8377; --accent: #1f7a4d;
+  }
+  :root[data-skin="sky"] {
+    --bg: #eef2f7; --panel: #f9fbfd; --border: #d6e0ec;
+    --text: #1e2836; --muted: #6f8098; --accent: #2563a8;
+  }
+  :root[data-skin="dark"] {
+    --bg: #1a1917; --panel: #232120; --border: #38342f;
+    --text: #ece9e4; --muted: #948d84; --accent: #fb923c;
+  }
+  :root[data-skin="nord"] {
+    --bg: #2e3440; --panel: #3b4252; --border: #4c566a;
+    --text: #e5e9f0; --muted: #98a3b5; --accent: #88c0d0;
+  }
+  :root[data-skin="ink"] {
+    --bg: #14161a; --panel: #1c1f25; --border: #2c313a;
+    --text: #dfe3ea; --muted: #8b93a3; --accent: #7aa2f7;
+  }
+  /* Only when no skin is chosen does the OS preference decide. */
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
+    :root:not([data-skin]) {
       --bg: #1a1917; --panel: #232120; --border: #38342f;
       --text: #ece9e4; --muted: #948d84; --accent: #fb923c;
     }
@@ -67,7 +94,7 @@
   }
   #preview {
     flex: 1; width: 50%; border: 0; border-left: 1px solid var(--border);
-    background: #fff;
+    background: var(--panel);
   }
   body.solo #preview { display: none; }
   body.solo #editor { width: 100%; }
@@ -93,6 +120,47 @@
   }
   .dlg-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
   .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  /* Rich text: the same writing surface, with markup rendered instead of
+     shown as syntax. */
+  #rich {
+    flex: 1; width: 50%; border: 0; outline: 0; overflow-y: auto;
+    padding: 28px 32px; background: var(--bg); color: var(--text);
+    font: 16px/1.8 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  #rich:empty::before { content: attr(data-placeholder); color: var(--muted); }
+  #rich h1 { font-size: 1.5em; margin: .9em 0 .5em; }
+  #rich h2 { font-size: 1.28em; margin: .9em 0 .45em; }
+  #rich h3 { font-size: 1.12em; margin: .8em 0 .4em; }
+  #rich p { margin: .85em 0; }
+  #rich ul, #rich ol { margin: .85em 0; padding-left: 1.7em; }
+  #rich li { margin: .3em 0; }
+  #rich blockquote {
+    margin: 1em 0; padding: .5em .9em; border-left: 3px solid var(--accent);
+    background: color-mix(in srgb, var(--accent) 7%, transparent);
+  }
+  #rich code {
+    font-family: ui-monospace, Menlo, monospace; font-size: .9em;
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    padding: .1em .35em; border-radius: 3px;
+  }
+  #rich pre {
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    padding: .9em; border-radius: 6px; overflow-x: auto;
+  }
+  #rich pre code { background: none; padding: 0; }
+  #rich a { color: var(--accent); }
+  #rich table { border-collapse: collapse; margin: 1em 0; width: 100%; }
+  #rich th, #rich td { border: 1px solid var(--border); padding: .45em .7em; }
+  #rich hr { border: 0; border-top: 1px solid var(--border); margin: 1.6em 0; }
+
+  /* Focus mode: one column, nothing else on screen. */
+  body.focus #sidebar, body.focus #preview { display: none; }
+  body.focus #bar { opacity: .15; transition: opacity .2s; }
+  body.focus #bar:hover { opacity: 1; }
+  body.focus #editor, body.focus #rich {
+    width: 100%; max-width: 46rem; margin: 0 auto;
+    padding: 6vh 2rem; font-size: 17px; line-height: 1.9;
+  }
   #mic.rec { background: var(--accent); color: #fff; border-color: var(--accent); }
   @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
   #mic.rec { animation: pulse 1.2s infinite; }
@@ -171,6 +239,13 @@
         <button id="pub" title="发布到公众号">发布</button>
         <button id="aiSettings" title="AI 设置">⚙</button>
       </span>
+      <select id="mode" title="写作模式">
+        <option value="markdown">Markdown</option>
+        <option value="rich">富文本</option>
+        <option value="focus">专注</option>
+      </select>
+      <select id="skin" title="背景配色"></select>
+      <button id="sound" title="环境音">🔊</button>
       <select id="theme" title="预览主题"></select>
       <button id="toggle" title="切换预览">预览</button>
       <button id="copy" title="复制为公众号格式">复制公众号</button>
@@ -180,6 +255,8 @@
     <div id="panes" style="display:none">
       <textarea id="editor" spellcheck="false"
                 placeholder="# 标题&#10;&#10;开始写…"></textarea>
+      <div id="rich" contenteditable="true" spellcheck="false"
+           data-placeholder="开始写…" style="display:none"></div>
       <iframe id="preview" sandbox=""></iframe>
     </div>
   </main>
@@ -222,6 +299,27 @@
         <button id="aiSave" value="save">保存</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="soundDialog">
+    <div class="dlg-body">
+      <h2>环境音</h2>
+      <div id="soundList" style="display:flex;gap:7px;flex-wrap:wrap"></div>
+      <div>
+        <label for="vol">音量</label>
+        <input id="vol" type="range" min="0" max="1" step="0.05">
+      </div>
+      <div class="dlg-note">
+        这些是实时合成的白噪音，不占体积也不会循环重复。<br>
+        想用自己的录音，把 mp3 / ogg / wav 放进
+        <code>~/cowrite/.cowrite/sounds/</code> 就会出现在上面。
+      </div>
+      <div class="dlg-actions">
+        <button id="soundStop" type="button">停止</button>
+        <span style="flex:1"></span>
+        <button id="soundClose" type="button">关闭</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="pubDialog">
@@ -384,6 +482,7 @@ async function open(id) {
   updateWords();
   renderPreview();
   updateAIButtons();
+  if (mode === 'rich') showRich();
   refreshList();
 }
 
@@ -439,9 +538,31 @@ async function renderPreview() {
       { body: editor.value, profile: 'preview', theme });
     // srcdoc + sandbox: post styles cannot leak into the app, and post
     // content cannot run script against it.
+    // The preview is its own document, so the skin's colours are passed
+    // in: a white pane beside a sepia editor is jarring to write against.
+    const css = getComputedStyle(document.documentElement);
+    const bg = css.getPropertyValue('--panel').trim();
+    const fg = css.getPropertyValue('--text').trim();
+    const muted = css.getPropertyValue('--muted').trim();
+    const border = css.getPropertyValue('--border').trim();
+    const dark = ['dark', 'nord', 'ink'].includes(document.documentElement.dataset.skin);
     previewEl.srcdoc =
       `<!doctype html><meta charset="utf-8">` +
-      `<style>body{margin:0;padding:26px 30px;}${r.css}</style>` + r.html;
+      `<style>body{margin:0;padding:26px 30px;background:${bg};color:${fg};}` +
+      `${r.css}` +
+      // The theme's own colours are tuned for a light page, so on a dark
+      // skin they are overridden after the theme rather than before it,
+      // where they would lose on specificity and leave text unreadable.
+      (dark
+        ? `.cw-root,.cw-root h1,.cw-root h2,.cw-root h3,.cw-root h4,` +
+          `.cw-root strong,.cw-root p,.cw-root li,.cw-root td,.cw-root th` +
+          `{color:${fg};}` +
+          `.cw-root blockquote{background:transparent;color:${muted};}` +
+          `.cw-root th{background:${bg};}` +
+          `.cw-root code,.cw-root pre{background:${bg};color:${fg};}` +
+          `.cw-root th,.cw-root td,.cw-root hr{border-color:${border};}`
+        : '') +
+      `</style>` + r.html;
   } catch (err) {
     setStatus('预览失败：' + err.message, true);
   }
@@ -1102,6 +1223,176 @@ events.addEventListener('change', async e => {
   setStatus('已载入外部修改');
 });
 
+// ---- 环境音 -------------------------------------------------------------
+
+// Synthesised rather than shipped as audio files: recordings would add
+// megabytes to the binary and carry licensing questions, while noise-based
+// sounds synthesise convincingly and loop forever without repeating.
+const Ambience = (() => {
+  let ctx = null, master = null, stop = null, current = null;
+
+  function audio() {
+    if (!ctx) {
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      master = ctx.createGain();
+      master.gain.value = Number(localStorage.getItem('cw.vol') || 0.4);
+      master.connect(ctx.destination);
+    }
+    return ctx;
+  }
+
+  // A few seconds of noise, looped. Long enough that the loop point is
+  // inaudible, short enough to generate instantly.
+  function noiseBuffer(seconds = 4) {
+    const c = audio();
+    const buf = c.createBuffer(1, c.sampleRate * seconds, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+  }
+
+  function noiseSource() {
+    const c = audio();
+    const src = c.createBufferSource();
+    src.buffer = noiseBuffer();
+    src.loop = true;
+    return src;
+  }
+
+  // Slow random drift, which is what makes noise sound like weather
+  // instead of a hiss.
+  function drift(param, base, depth, seconds) {
+    const c = audio();
+    let t = c.currentTime;
+    param.setValueAtTime(base, t);
+    for (let i = 0; i < 60; i++) {
+      t += seconds * (0.6 + Math.random() * 0.8);
+      param.linearRampToValueAtTime(base + (Math.random() * 2 - 1) * depth, t);
+    }
+  }
+
+  const builders = {
+    waves() {
+      const c = audio();
+      const src = noiseSource();
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 520;
+      const swell = c.createGain();
+      swell.gain.value = 0.35;
+      // Long swell and retreat, roughly the period of real surf.
+      drift(swell.gain, 0.35, 0.28, 5.5);
+      drift(lp.frequency, 520, 260, 6);
+      src.connect(lp); lp.connect(swell); swell.connect(master);
+      src.start();
+      return () => src.stop();
+    },
+    rain() {
+      const c = audio();
+      const src = noiseSource();
+      const hp = c.createBiquadFilter();
+      hp.type = 'highpass'; hp.frequency.value = 900;
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 6500;
+      const g = c.createGain(); g.gain.value = 0.22;
+      drift(g.gain, 0.22, 0.05, 3);
+      src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master);
+      src.start();
+      return () => src.stop();
+    },
+    storm() {
+      const c = audio();
+      const src = noiseSource();
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 2200;
+      const g = c.createGain(); g.gain.value = 0.3;
+      drift(g.gain, 0.3, 0.14, 2.2);
+      drift(lp.frequency, 2200, 900, 4);
+      src.connect(lp); lp.connect(g); g.connect(master);
+      src.start();
+      return () => src.stop();
+    },
+    stream() {
+      const c = audio();
+      const src = noiseSource();
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 0.7;
+      const g = c.createGain(); g.gain.value = 0.26;
+      drift(bp.frequency, 1400, 420, 1.8);
+      src.connect(bp); bp.connect(g); g.connect(master);
+      src.start();
+      return () => src.stop();
+    },
+    wind() {
+      const c = audio();
+      const src = noiseSource();
+      const bp = c.createBiquadFilter();
+      bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 1.4;
+      const g = c.createGain(); g.gain.value = 0.3;
+      drift(bp.frequency, 420, 260, 4.5);
+      drift(g.gain, 0.3, 0.16, 5);
+      src.connect(bp); bp.connect(g); g.connect(master);
+      src.start();
+      return () => src.stop();
+    },
+    fire() {
+      const c = audio();
+      const src = noiseSource();
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1100;
+      const g = c.createGain(); g.gain.value = 0.2;
+      // Fast, irregular flicker: crackle rather than weather.
+      drift(g.gain, 0.2, 0.13, 0.35);
+      src.connect(lp); lp.connect(g); g.connect(master);
+      src.start();
+      return () => src.stop();
+    },
+    brown() {
+      const c = audio();
+      const src = noiseSource();
+      const lp = c.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 320;
+      const g = c.createGain(); g.gain.value = 0.45;
+      src.connect(lp); lp.connect(g); g.connect(master);
+      src.start();
+      return () => src.stop();
+    },
+  };
+
+  async function playFile(url) {
+    const c = audio();
+    const src = c.createBufferSource();
+    const res = await fetch(url);
+    src.buffer = await c.decodeAudioData(await res.arrayBuffer());
+    src.loop = true;
+    src.connect(master);
+    src.start();
+    return () => src.stop();
+  }
+
+  return {
+    list: Object.keys(builders),
+    playing: () => current,
+    async play(id, fileURL) {
+      this.stop();
+      audio();
+      // Browsers start the context suspended until a user gesture.
+      if (ctx.state === 'suspended') await ctx.resume();
+      stop = fileURL ? await playFile(fileURL) : builders[id]();
+      current = id;
+    },
+    stop() {
+      if (stop) { try { stop(); } catch {} stop = null; }
+      current = null;
+    },
+    volume(v) {
+      audio();
+      master.gain.value = v;
+      localStorage.setItem('cw.vol', String(v));
+    },
+    getVolume: () => Number(localStorage.getItem('cw.vol') || 0.4),
+  };
+})();
+
 // ---- 搜索 ---------------------------------------------------------------
 
 const searchEl = $('#search');
@@ -1143,9 +1434,138 @@ $('#export').onclick = async () => {
     `/api/posts/${current.id}/export?format=${fmt}&theme=${encodeURIComponent(theme)}`;
 };
 
+// ---- 写作模式与配色 ------------------------------------------------------
+
+const richEl = $('#rich'), modeSel = $('#mode'), skinSel = $('#skin');
+let mode = localStorage.getItem('cw.mode') || 'markdown';
+
+const SKINS = [
+  ['paper', '纸白'], ['sepia', '米黄'], ['mint', '薄荷'],
+  ['sky', '天青'], ['dark', '深褐'], ['nord', '极夜'], ['ink', '墨蓝'],
+];
+
+function applySkin(id) {
+  document.documentElement.dataset.skin = id;
+  localStorage.setItem('cw.skin', id);
+  // The preview renders in its own document, so it has to be told too.
+  renderPreview();
+}
+
+for (const [id, name] of SKINS) {
+  const o = document.createElement('option');
+  o.value = id; o.textContent = name;
+  skinSel.append(o);
+}
+skinSel.value = localStorage.getItem('cw.skin') || 'paper';
+applySkin(skinSel.value);
+skinSel.onchange = () => applySkin(skinSel.value);
+
+// Rich text edits are converted back to markdown before saving, so the
+// file on disk is markdown no matter which mode wrote it.
+async function syncRichToEditor() {
+  if (mode !== 'rich') return;
+  const r = await api('POST', '/to-markdown', { html: richEl.innerHTML });
+  if (r.markdown !== editor.value) {
+    editor.value = r.markdown;
+    dirty = true;
+  }
+}
+
+async function showRich() {
+  const r = await api('POST', '/render',
+    { body: editor.value, profile: 'generic', theme });
+  richEl.innerHTML = r.html;
+}
+
+async function applyMode(next) {
+  // Carry pending edits across the switch in whichever direction.
+  if (mode === 'rich' && next !== 'rich') await syncRichToEditor();
+
+  mode = next;
+  localStorage.setItem('cw.mode', mode);
+  modeSel.value = mode;
+  document.body.classList.toggle('focus', mode === 'focus');
+
+  const rich = mode === 'rich';
+  richEl.style.display = rich ? '' : 'none';
+  editor.style.display = rich ? 'none' : '';
+  if (rich) await showRich();
+  if (mode !== 'focus') renderPreview();
+}
+
+modeSel.onchange = () => applyMode(modeSel.value);
+
+richEl.addEventListener('input', () => {
+  dirty = true;
+  setStatus('未保存');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    await syncRichToEditor();
+    save();
+  }, 900);
+});
+richEl.addEventListener('blur', async () => {
+  await syncRichToEditor();
+  save();
+});
+
+// ---- 环境音界面 ----------------------------------------------------------
+
+const soundDlg = $('#soundDialog'), soundList = $('#soundList'), volEl = $('#vol');
+
+const SOUND_NAMES = {
+  waves: '海浪', rain: '雨声', storm: '暴雨',
+  stream: '溪流', wind: '风声', fire: '篝火', brown: '低频',
+};
+
+async function loadSounds() {
+  soundList.innerHTML = '';
+  const add = (id, label, fileURL) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = label;
+    if (Ambience.playing() === id) {
+      b.style.borderColor = 'var(--accent)';
+      b.style.color = 'var(--accent)';
+    }
+    b.onclick = async () => {
+      if (Ambience.playing() === id) { Ambience.stop(); }
+      else {
+        try { await Ambience.play(id, fileURL); }
+        catch (err) { toast('播放失败：' + err.message); }
+      }
+      updateSoundBadge();
+      loadSounds();
+    };
+    soundList.append(b);
+  };
+
+  for (const id of Ambience.list) add(id, SOUND_NAMES[id] || id);
+
+  // Whatever the user put in their sounds directory.
+  try {
+    for (const f of await api('GET', '/sounds')) {
+      add('file:' + f.file, f.name, '/api/sounds/' + encodeURIComponent(f.file));
+    }
+  } catch {}
+}
+
+function updateSoundBadge() {
+  $('#sound').textContent = Ambience.playing() ? '🔈' : '🔊';
+  $('#sound').style.color = Ambience.playing() ? 'var(--accent)' : '';
+}
+
+$('#sound').onclick = async () => { await loadSounds(); soundDlg.showModal(); };
+$('#soundClose').onclick = () => soundDlg.close();
+$('#soundStop').onclick = () => { Ambience.stop(); updateSoundBadge(); loadSounds(); };
+
+volEl.value = String(Ambience.getVolume());
+volEl.oninput = () => Ambience.volume(Number(volEl.value));
+
 loadThemes();
 loadAI();
 loadVoice();
+applyMode(mode);
 refreshList();
 </script>
 </body>
