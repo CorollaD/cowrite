@@ -3,13 +3,26 @@
   "name": "cowrite 发布助手",
   "version": "0.1.0",
   "description": "把 cowrite 里写好的文章填进各平台的编辑器。内容只在本机和你已登录的平台之间流动。",
-  "permissions": ["scripting", "tabs", "cookies", "storage"],
+  "permissions": [
+    "scripting",
+    "tabs",
+    "cookies",
+    "storage"
+  ],
   "host_permissions": [
     "https://zhuanlan.zhihu.com/*",
     "https://www.zhihu.com/*",
     "https://juejin.cn/*",
-    "https://mp.weixin.qq.com/*"
+    "https://mp.weixin.qq.com/*",
+    "https://editor.csdn.net/*",
+    "https://www.csdn.net/*",
+    "https://segmentfault.com/*"
   ],
-  "background": { "service_worker": "background.js", "type": "module" },
-  "action": { "default_popup": "popup.html" }
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
 }

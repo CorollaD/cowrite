@@ -156,7 +156,7 @@
         <button data-cmd="continue">续写</button>
         <button data-cmd="title">起标题</button>
         <button data-cmd="summary">摘要</button>
-        <button id="mic" title="按住说话（或点击开始/停止）">🎤</button>
+        <button id="mic" title="按住说话（或点击开始/停止）。选中文字后说指令可直接修改，例如「改短一点」">🎤</button>
         <button id="hist" title="版本历史">🕘</button>
         <button id="pub" title="发布到公众号">发布</button>
         <button id="aiSettings" title="AI 设置">⚙</button>
@@ -740,6 +740,10 @@ async function sendAudio(blob) {
 
   const fd = new FormData();
   fd.append('audio', blob, 'clip.webm');
+  // With text selected, a short recording is treated as an instruction
+  // about it rather than prose to insert.
+  const sel = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+  if (sel.trim()) fd.append('selection', sel);
 
   resultTitle.textContent = '转写中…';
   resultText.textContent = '';
@@ -747,7 +751,9 @@ async function sendAudio(blob) {
   rawText.classList.remove('show');
   rawToggle.style.display = 'none';
   resultEl.classList.add('show');
-  lastScope = { start: editor.selectionEnd, end: editor.selectionEnd, append: true };
+  lastScope = sel.trim()
+    ? { start: editor.selectionStart, end: editor.selectionEnd }
+    : { start: editor.selectionEnd, end: editor.selectionEnd, append: true };
 
   let r;
   try {
@@ -780,13 +786,18 @@ async function sendAudio(blob) {
     return;
   }
 
-  resultTitle.textContent = '整理中…';
+  resultTitle.textContent = r.instruction ? '按语音指令修改中…' : '整理中…';
+  if (r.instruction) {
+    // The spoken words were the command, so showing them as "raw
+    // transcript" would be confusing.
+    rawToggle.textContent = '查看你说的指令';
+  }
   const es = new EventSource(`/api/ai/stream/${r.jobId}`);
   activeStream = es;
   activeJob = r.jobId;
   es.addEventListener('delta', e => { resultText.textContent += JSON.parse(e.data); });
   es.addEventListener('done', () => {
-    resultTitle.textContent = '语音整理';
+    resultTitle.textContent = r.instruction ? '语音指令结果' : '语音整理';
     es.close(); activeStream = null; activeJob = null;
   });
   es.addEventListener('error', () => {
@@ -799,9 +810,12 @@ async function sendAudio(blob) {
 }
 
 rawToggle.onclick = () => {
-  rawText.classList.toggle('show');
-  rawToggle.textContent = rawText.classList.contains('show')
-    ? '收起原始转写' : '查看原始转写';
+  const open = !rawText.classList.contains('show');
+  rawText.classList.toggle('show', open);
+  const isCmd = resultTitle.textContent.includes('指令');
+  rawToggle.textContent = open
+    ? (isCmd ? '收起指令' : '收起原始转写')
+    : (isCmd ? '查看你说的指令' : '查看原始转写');
 };
 
 micBtn.onclick = () => recording ? stopRecording() : startRecording();

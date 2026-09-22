@@ -157,3 +157,44 @@ func TestBuildCleanupPromptAppendsVocabulary(t *testing.T) {
 		t.Error("blank vocabulary should add nothing")
 	}
 }
+
+func TestBuildCommandPromptCarriesBothParts(t *testing.T) {
+	got := BuildCommandPrompt("改短一点", "这是一段很长很长的原文。")
+	if !strings.Contains(got, "改短一点") {
+		t.Error("spoken instruction missing from prompt")
+	}
+	if !strings.Contains(got, "这是一段很长很长的原文。") {
+		t.Error("selected text missing from prompt")
+	}
+	for _, ph := range []string{"{{.Instruction}}", "{{.Text}}"} {
+		if strings.Contains(got, ph) {
+			t.Errorf("placeholder %s left unfilled", ph)
+		}
+	}
+}
+
+// A short utterance about the text is a command; dictated prose is not.
+func TestLooksLikeInstruction(t *testing.T) {
+	commands := []string{
+		"改短一点", "换成更正式的语气", "把这段改成列表",
+		"翻译成英文", "精简一下", "去掉最后一句",
+	}
+	for _, c := range commands {
+		if !LooksLikeInstruction(c) {
+			t.Errorf("%q should be treated as an instruction", c)
+		}
+	}
+
+	dictation := []string{
+		"今天我想聊一聊这个项目的架构设计",
+		"第一点是编辑器第二点是渲染",
+		// Long enough to be prose even though it contains a hint word.
+		"我们改成这样以后整个流程就顺畅多了，用户不用再手动去调整格式，" +
+			"系统会自动处理好所有的排版细节，这是一个很大的改进",
+	}
+	for _, d := range dictation {
+		if LooksLikeInstruction(d) {
+			t.Errorf("%q should be treated as dictation, not a command", d)
+		}
+	}
+}

@@ -119,6 +119,9 @@ func (s *Server) handleSaveVoiceConfig(w http.ResponseWriter, r *http.Request) {
 type transcribeResponse struct {
 	Raw   string `json:"raw"`
 	JobID string `json:"jobId,omitempty"`
+	// Instruction is set when the transcript reads as a spoken edit
+	// command rather than dictated prose.
+	Instruction bool `json:"instruction,omitempty"`
 }
 
 // handleTranscribe accepts recorded audio, transcribes it, and prepares the
@@ -136,6 +139,10 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusBadRequest, "语音尚未配置，请先在设置里选择转写服务", nil)
 		return
 	}
+
+	// When text is selected the recording is treated as an instruction
+	// about it, so "make this shorter" edits rather than being inserted.
+	selection := r.FormValue("selection")
 
 	if err := r.ParseMultipartForm(maxAudioBytes); err != nil {
 		s.fail(w, http.StatusBadRequest, "读取音频失败", err)
@@ -175,6 +182,11 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if selection == "" {
+		selection = r.FormValue("selection")
+	}
+	instruction := selection != "" && voice.LooksLikeInstruction(raw)
+
 	// Cleanup runs through the chat model, which may be a different
 	// provider than transcription; if none is set the raw text still stands
 	// on its own.
@@ -189,15 +201,24 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	req := ai.Request{
+		System:      voice.CleanupSystem,
+		Prompt:      voice.BuildCleanupPrompt(raw, cfg.Vocabulary),
+		Model:       aiCfg.Model,
+		Temperature: 0.1, // cleanup must be boring and repeatable
+	}
+	if instruction {
+		req.System = voice.CommandSystem
+		req.Prompt = voice.BuildCommandPrompt(raw, selection)
+		req.Temperature = 0.3
+	}
+
 	jobID := s.newJobID()
 	s.jobs.add(jobID, &aiJob{
 		client: ai.NewClient(aiCfg.BaseURL, aiKey),
-		req: ai.Request{
-			System:      voice.CleanupSystem,
-			Prompt:      voice.BuildCleanupPrompt(raw, cfg.Vocabulary),
-			Model:       aiCfg.Model,
-			Temperature: 0.1, // cleanup must be boring and repeatable
-		},
+		req:    req,
 	})
-	writeJSON(w, http.StatusOK, transcribeResponse{Raw: raw, JobID: jobID})
+	writeJSON(w, http.StatusOK, transcribeResponse{
+		Raw: raw, JobID: jobID, Instruction: instruction,
+	})
 }

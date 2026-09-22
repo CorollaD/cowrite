@@ -7,8 +7,11 @@
 import { injectUtils } from './platforms/utils.js';
 import { zhihu } from './platforms/zhihu.js';
 import { juejin } from './platforms/juejin.js';
+import { wechat } from './platforms/wechat.js';
+import { csdn } from './platforms/csdn.js';
+import { segmentfault } from './platforms/segmentfault.js';
 
-const PLATFORMS = { zhihu, juejin };
+const PLATFORMS = { zhihu, juejin, wechat, csdn, segmentfault };
 const DEFAULT_PORT = 8080;
 
 let socket = null;

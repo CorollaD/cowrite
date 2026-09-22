@@ -17,8 +17,16 @@ import (
 // extensionPlatforms are the targets reached through the companion
 // extension, for platforms with no usable write API.
 var extensionPlatforms = map[string]string{
-	"zhihu":  "知乎",
-	"juejin": "掘金",
+	"zhihu":        "知乎",
+	"juejin":       "掘金",
+	"wechat":       "公众号",
+	"csdn":         "CSDN",
+	"segmentfault": "思否",
+}
+
+// markdownPlatforms take the markdown source; the rest take rendered HTML.
+var markdownPlatforms = map[string]bool{
+	"juejin": true, "csdn": true, "segmentfault": true,
 }
 
 func (s *Server) handleBridgeStatus(w http.ResponseWriter, r *http.Request) {
