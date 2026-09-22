@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/corollad/cowrite/internal/ai"
 	"github.com/corollad/cowrite/internal/config"
+	"github.com/corollad/cowrite/internal/history"
 	"github.com/corollad/cowrite/internal/index"
 	"github.com/corollad/cowrite/internal/server"
 	"github.com/corollad/cowrite/internal/store"
@@ -66,5 +68,28 @@ func run() error {
 		}
 	}()
 
-	return server.New(cfg, ws, db, ix, log).ListenAndServe()
+	srv := server.New(cfg, ws, db, ix, log)
+
+	// Watch the workspace so edits made in another editor show up here,
+	// and tell any open browser about them.
+	ctx, stopWatch := context.WithCancel(context.Background())
+	defer stopWatch()
+	watcher := index.NewWatcher(ix, ws, func(c index.Change) {
+		log.Info("file changed on disk", "path", c.RelPath, "kind", c.Kind)
+		srv.Publish("file", c)
+	})
+	go func() {
+		if err := watcher.Run(ctx); err != nil {
+			log.Warn("file watcher stopped", "err", err)
+		}
+	}()
+
+	// Thin out old automatic snapshots once at startup.
+	go func() {
+		if n, err := history.New(filepath.Join(cfg.Workspace, ".cowrite"), db).Prune(); err == nil && n > 0 {
+			log.Info("pruned old snapshots", "count", n)
+		}
+	}()
+
+	return srv.ListenAndServe()
 }

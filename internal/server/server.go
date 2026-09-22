@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/corollad/cowrite/internal/config"
+	"github.com/corollad/cowrite/internal/history"
 	"github.com/corollad/cowrite/internal/index"
 	"github.com/corollad/cowrite/internal/render"
 	"github.com/corollad/cowrite/internal/secret"
@@ -32,6 +33,8 @@ type Server struct {
 	renderer *render.Renderer
 	secrets  *secret.Store
 	jobs     *jobRegistry
+	history  *history.History
+	events   *eventBus
 }
 
 func New(cfg config.Config, ws *workspace.Workspace, db *store.DB, ix *index.Index, log *slog.Logger) *Server {
@@ -40,6 +43,8 @@ func New(cfg config.Config, ws *workspace.Workspace, db *store.DB, ix *index.Ind
 		renderer: render.New(),
 		secrets:  secret.New(filepath.Join(cfg.Workspace, ".cowrite")),
 		jobs:     newJobRegistry(),
+		history:  history.New(filepath.Join(cfg.Workspace, ".cowrite"), db),
+		events:   newEventBus(),
 	}
 }
 
@@ -51,8 +56,13 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/posts", s.handleListPosts)
 		r.Post("/posts", s.handleCreatePost)
 		r.Get("/posts/{id}", s.handleGetPost)
+		r.Get("/posts/{id}/versions", s.handleListVersions)
+		r.Post("/posts/{id}/versions", s.handleSnapshot)
+		r.Get("/posts/{id}/versions/{versionId}", s.handleGetVersion)
+		r.Post("/posts/{id}/versions/{versionId}/restore", s.handleRestoreVersion)
 		r.Put("/posts/{id}", s.handleUpdatePost)
 		r.Delete("/posts/{id}", s.handleDeletePost)
+		r.Get("/events", s.handleEvents)
 		r.Post("/render", s.handleRender)
 		r.Route("/ai", func(r chi.Router) {
 			r.Get("/config", s.handleGetAIConfig)

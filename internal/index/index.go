@@ -17,6 +17,9 @@ type Index struct {
 	log *slog.Logger
 }
 
+// DB exposes the index database for the watcher.
+func (ix *Index) DB() *store.DB { return ix.db }
+
 func New(ws *workspace.Workspace, db *store.DB, log *slog.Logger) *Index {
 	return &Index{ws: ws, db: db, log: log}
 }

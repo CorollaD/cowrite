@@ -110,6 +110,24 @@
     white-space: pre-wrap; max-height: 260px; overflow-y: auto;
     font-size: 14px; line-height: 1.7; margin-bottom: 12px;
   }
+  #vlist { max-height: 300px; overflow-y: auto; margin: 0 -4px; }
+  .ver {
+    padding: 9px 10px; border-radius: 6px; cursor: pointer;
+    display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  }
+  .ver:hover { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+  .ver .when { font-size: 13px; }
+  .ver .meta { font-size: 12px; color: var(--muted); }
+  .ver .tag {
+    font-size: 11px; border: 1px solid var(--border);
+    border-radius: 4px; padding: 0 5px; color: var(--muted);
+  }
+  #verPreview {
+    display: none; white-space: pre-wrap; font-size: 13px; line-height: 1.6;
+    max-height: 200px; overflow-y: auto; background: var(--bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-top: 10px;
+  }
+  #verPreview.show { display: block; }
   #toast {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
     background: var(--text); color: var(--bg); padding: 9px 18px;
@@ -139,6 +157,7 @@
         <button data-cmd="title">起标题</button>
         <button data-cmd="summary">摘要</button>
         <button id="mic" title="按住说话（或点击开始/停止）">🎤</button>
+        <button id="hist" title="版本历史">🕘</button>
         <button id="aiSettings" title="AI 设置">⚙</button>
       </span>
       <select id="theme" title="预览主题"></select>
@@ -191,6 +210,21 @@
         <button id="aiSave" value="save">保存</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="histDialog">
+    <div class="dlg-body">
+      <h2>版本历史</h2>
+      <div id="vlist"></div>
+      <div id="verPreview"></div>
+      <div class="dlg-note" id="histNote"></div>
+      <div class="dlg-actions">
+        <button id="histSnapshot" type="button">存一个快照</button>
+        <span style="flex:1"></span>
+        <button id="histRestore" type="button" disabled>恢复这个版本</button>
+        <button id="histClose" type="button">关闭</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="voiceDialog">
@@ -278,6 +312,7 @@ async function open(id) {
   panesEl.style.display = '';
   emptyEl.style.display = 'none';
   dirty = false;
+  externalPending = false;
   setStatus('已保存');
   updateWords();
   renderPreview();
@@ -296,6 +331,7 @@ async function save() {
     });
     current.hash = p.hash;
     dirty = false;
+    externalPending = false;
     setStatus('已保存');
     refreshList();
   } catch (err) {
@@ -730,6 +766,130 @@ $('#openVoice').onclick = async () => {
   await loadVoice();
   vDlg.showModal();
 };
+
+// ---- 版本历史 -----------------------------------------------------------
+
+const histDlg = $('#histDialog'), vlist = $('#vlist'),
+      verPreview = $('#verPreview'), histNote = $('#histNote'),
+      histRestore = $('#histRestore');
+
+let selectedVersion = null;
+// Set when the file changed on disk while the editor had unsaved text.
+let externalPending = false;
+
+const KIND_LABEL = {
+  auto: '自动', manual: '手动',
+  'pre-publish': '发布前', 'pre-merge': '冲突前',
+};
+
+async function loadVersions() {
+  if (!current) return;
+  selectedVersion = null;
+  histRestore.disabled = true;
+  verPreview.classList.remove('show');
+
+  const list = await api('GET', `/posts/${current.id}/versions`);
+  vlist.innerHTML = '';
+  if (!list.length) {
+    histNote.textContent = '还没有快照。编辑一段时间后会自动存，也可以手动存一个。';
+    return;
+  }
+  histNote.textContent = '点一个版本可以先预览，再决定要不要恢复。';
+
+  for (const v of list) {
+    const el = document.createElement('div');
+    el.className = 'ver';
+    el.innerHTML = '<span class="when"></span><span class="meta"></span>';
+    el.querySelector('.when').textContent =
+      new Date(v.createdAt * 1000).toLocaleString('zh-CN');
+    el.querySelector('.meta').innerHTML =
+      `${v.wordCount} 字 <span class="tag">${KIND_LABEL[v.kind] || v.kind}</span>`;
+    el.onclick = async () => {
+      const r = await api('GET', `/posts/${current.id}/versions/${v.id}`);
+      selectedVersion = v.id;
+      verPreview.textContent = r.body;
+      verPreview.classList.add('show');
+      histRestore.disabled = false;
+    };
+    vlist.append(el);
+  }
+}
+
+$('#hist').onclick = async () => {
+  if (!current) { toast('先打开一篇文章'); return; }
+  await loadVersions();
+  histDlg.showModal();
+};
+
+$('#histClose').onclick = () => histDlg.close();
+
+$('#histSnapshot').onclick = async () => {
+  if (dirty) await save();
+  try {
+    await api('POST', `/posts/${current.id}/versions`);
+    await loadVersions();
+    toast('已存快照');
+  } catch (err) {
+    toast('失败：' + err.message);
+  }
+};
+
+$('#histRestore').onclick = async () => {
+  if (!selectedVersion) return;
+  try {
+    // The server snapshots the current text first, so this is undoable.
+    const r = await api('POST',
+      `/posts/${current.id}/versions/${selectedVersion}/restore`,
+      { baseHash: current.hash });
+    editor.value = r.body;
+    current.hash = r.hash;
+    dirty = false;
+    histDlg.close();
+    updateWords();
+    renderPreview();
+    refreshList();
+    toast('已恢复（当前内容也存了快照）');
+  } catch (err) {
+    toast('恢复失败：' + err.message);
+  }
+};
+
+// ---- 磁盘变更提醒 --------------------------------------------------------
+
+// The watcher reports edits made outside this browser. Reloading silently
+// would throw away whatever the user is typing, so an unsaved buffer only
+// gets a warning and the choice stays with them.
+const events = new EventSource('/api/events');
+events.addEventListener('change', async e => {
+  let msg;
+  try { msg = JSON.parse(e.data); } catch { return; }
+  if (msg.kind !== 'file' || !msg.data) return;
+
+  const c = msg.data;
+  refreshList();
+  if (!current || c.postId !== current.id) return;
+
+  if (c.kind === 'removed') {
+    setStatus('这篇文章的文件已被删除', true);
+    return;
+  }
+  if (dirty) {
+    // Reloading would discard what they are typing, so the buffer is left
+    // alone and the choice is deferred to the save, which detects the
+    // conflict and shows both versions.
+    externalPending = true;
+    setStatus('文件已在外部修改（你有未保存的改动）', true);
+    toast('文件在别处被改了，保存时会让你选择');
+    return;
+  }
+  externalPending = false;
+  const p = await api('GET', `/posts/${current.id}`);
+  editor.value = p.body;
+  current.hash = p.hash;
+  updateWords();
+  renderPreview();
+  setStatus('已载入外部修改');
+});
 
 loadThemes();
 loadAI();

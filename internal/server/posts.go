@@ -177,6 +177,11 @@ func (s *Server) handleUpdatePost(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusInternalServerError, "reindex post", err)
 		return
 	}
+	// Autosave fires constantly, so the policy inside Snapshot decides
+	// whether this save is worth keeping as a restore point.
+	if _, err := s.history.Snapshot(p.ID, post.Body, store.KindAuto); err != nil {
+		s.log.Warn("snapshot failed", "post", p.ID, "err", err)
+	}
 
 	updated, err := s.db.GetPost(p.ID)
 	if err != nil {
