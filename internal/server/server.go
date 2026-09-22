@@ -63,6 +63,11 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/stream/{id}", s.handleAIStream)
 			r.Delete("/stream/{id}", s.handleAICancel)
 		})
+		r.Route("/voice", func(r chi.Router) {
+			r.Get("/config", s.handleGetVoiceConfig)
+			r.Put("/config", s.handleSaveVoiceConfig)
+			r.Post("/transcribe", s.handleTranscribe)
+		})
 		r.Get("/themes", s.handleListThemes)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

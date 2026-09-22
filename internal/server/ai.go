@@ -65,6 +65,9 @@ func (r *jobRegistry) cancel(id string) bool {
 	return ok
 }
 
+// newJobID mints an id for a prepared streaming job.
+func (s *Server) newJobID() string { return uuid.NewString() }
+
 type aiConfig struct {
 	ProviderID string `json:"providerId"`
 	BaseURL    string `json:"baseURL"`
@@ -223,7 +226,7 @@ func (s *Server) handleAIRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	id := uuid.NewString()
+	id := s.newJobID()
 	s.jobs.add(id, &aiJob{
 		client: ai.NewClient(cfg.BaseURL, key),
 		req: ai.Request{

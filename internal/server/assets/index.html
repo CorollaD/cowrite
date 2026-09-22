@@ -84,6 +84,20 @@
   }
   .dlg-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
   .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  #mic.rec { background: var(--accent); color: #fff; border-color: var(--accent); }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
+  #mic.rec { animation: pulse 1.2s infinite; }
+  .dlg-body textarea {
+    width: 100%; font: inherit; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+    resize: vertical; min-height: 56px;
+  }
+  #rawToggle { font-size: 12px; color: var(--muted); cursor: pointer; margin-bottom: 8px; }
+  #rawText {
+    display: none; white-space: pre-wrap; font-size: 13px; color: var(--muted);
+    border-left: 2px solid var(--border); padding-left: 10px; margin-bottom: 10px;
+  }
+  #rawText.show { display: block; }
   #result { position: fixed; inset: auto 0 0 0; display: none; }
   #result.show { display: block; }
   #result .inner {
@@ -124,6 +138,7 @@
         <button data-cmd="continue">续写</button>
         <button data-cmd="title">起标题</button>
         <button data-cmd="summary">摘要</button>
+        <button id="mic" title="按住说话（或点击开始/停止）">🎤</button>
         <button id="aiSettings" title="AI 设置">⚙</button>
       </span>
       <select id="theme" title="预览主题"></select>
@@ -140,6 +155,8 @@
   <div id="result">
     <div class="inner">
       <h3 id="resultTitle">AI</h3>
+      <div id="rawToggle" style="display:none">查看原始转写</div>
+      <div id="rawText"></div>
       <div id="resultText"></div>
       <div class="dlg-actions">
         <button id="resultStop">停止</button>
@@ -168,8 +185,42 @@
       </div>
       <div class="dlg-note">Key 存在系统钥匙串，不会写进工作区或索引，也不会回传浏览器。</div>
       <div class="dlg-actions">
+        <button id="openVoice" type="button">语音设置…</button>
+        <span style="flex:1"></span>
         <button value="cancel">取消</button>
         <button id="aiSave" value="save">保存</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="voiceDialog">
+    <form method="dialog" class="dlg-body">
+      <h2>语音设置</h2>
+      <div>
+        <label for="vProvider">转写服务</label>
+        <select id="vProvider"></select>
+      </div>
+      <div class="dlg-note" id="vNote"></div>
+      <div>
+        <label for="vKey">API Key</label>
+        <input id="vKey" type="password" placeholder="留空则不修改">
+      </div>
+      <div>
+        <label for="vModel">转写模型</label>
+        <input id="vModel" placeholder="例如 whisper-large-v3-turbo">
+      </div>
+      <div>
+        <label for="vLang">语言</label>
+        <input id="vLang" placeholder="zh / en，留空自动判断">
+      </div>
+      <div>
+        <label for="vVocab">专有名词</label>
+        <textarea id="vVocab" placeholder="逗号分隔，例如：cowrite, goldmark, 张三"></textarea>
+      </div>
+      <div class="dlg-note">整理用的模型取自「AI 设置」。音频转写完即丢，不落盘。</div>
+      <div class="dlg-actions">
+        <button value="cancel">取消</button>
+        <button id="vSave" value="save">保存</button>
       </div>
     </form>
   </dialog>
@@ -510,8 +561,179 @@ $('#resultInsert').onclick = () => {
   save();
 };
 
+// ---- 语音输入 -----------------------------------------------------------
+
+const micBtn = $('#mic'), vDlg = $('#voiceDialog'), vProvider = $('#vProvider'),
+      vNote = $('#vNote'), vKey = $('#vKey'), vModel = $('#vModel'),
+      vLang = $('#vLang'), vVocab = $('#vVocab'),
+      rawToggle = $('#rawToggle'), rawText = $('#rawText');
+
+let recorder = null, chunks = [], recording = false, voiceCfg = null;
+
+async function loadVoice() {
+  const r = await api('GET', '/voice/config');
+  voiceCfg = r.config;
+  vProvider.innerHTML = '';
+  for (const p of r.providers) {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = p.name + (p.free ? ' · 免费' : '');
+    vProvider.append(o);
+  }
+  if (voiceCfg.providerId) vProvider.value = voiceCfg.providerId;
+  vModel.value = voiceCfg.model || '';
+  vLang.value = voiceCfg.language || '';
+  vVocab.value = voiceCfg.vocabulary || '';
+  showVoiceNote(r.providers);
+}
+
+function showVoiceNote(list) {
+  const p = (list || []).find(x => x.id === vProvider.value);
+  vNote.textContent = p ? p.notes : '';
+  vKey.placeholder = p?.auth === 'none'
+    ? '本地服务，不需要 key'
+    : (voiceCfg?.hasKey ? '已保存，留空则不修改' : '粘贴你的 API Key');
+}
+
+vProvider.onchange = () => loadVoice().then(() => {});
+
+$('#vSave').onclick = async () => {
+  try {
+    voiceCfg = await api('PUT', '/voice/config', {
+      providerId: vProvider.value,
+      model: vModel.value.trim(),
+      language: vLang.value.trim(),
+      vocabulary: vVocab.value.trim(),
+      apiKey: vKey.value,
+    });
+    vKey.value = '';
+    toast('已保存');
+  } catch (err) {
+    toast('保存失败：' + err.message);
+  }
+};
+
+async function startRecording() {
+  if (recording) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    chunks = [];
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    recorder.onstop = async () => {
+      // Release the mic as soon as recording ends: a live indicator that
+      // outlasts the recording is alarming and rightly so.
+      stream.getTracks().forEach(t => t.stop());
+      await sendAudio(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }));
+    };
+    recorder.start();
+    recording = true;
+    micBtn.classList.add('rec');
+    setStatus('录音中…');
+  } catch (err) {
+    toast('无法录音：' + err.message);
+  }
+}
+
+function stopRecording() {
+  if (!recording) return;
+  recording = false;
+  micBtn.classList.remove('rec');
+  recorder.stop();
+  setStatus('转写中…');
+}
+
+async function sendAudio(blob) {
+  if (!blob.size) { setStatus('没有录到声音', true); return; }
+
+  const fd = new FormData();
+  fd.append('audio', blob, 'clip.webm');
+
+  resultTitle.textContent = '转写中…';
+  resultText.textContent = '';
+  rawText.textContent = '';
+  rawText.classList.remove('show');
+  rawToggle.style.display = 'none';
+  resultEl.classList.add('show');
+  lastScope = { start: editor.selectionEnd, end: editor.selectionEnd, append: true };
+
+  let r;
+  try {
+    const res = await fetch('/api/voice/transcribe', { method: 'POST', body: fd });
+    r = await res.json();
+    if (!res.ok) throw new Error(r.error || res.statusText);
+  } catch (err) {
+    resultTitle.textContent = '转写失败';
+    resultText.textContent = err.message;
+    setStatus('转写失败', true);
+    return;
+  }
+
+  setStatus('已保存');
+  if (!r.raw) {
+    resultTitle.textContent = '没有识别到内容';
+    resultEl.classList.remove('show');
+    toast('没有识别到内容');
+    return;
+  }
+
+  // Keep the raw transcript reachable: the cleanup pass is an edit, and the
+  // user should always be able to see and take what was actually said.
+  rawText.textContent = r.raw;
+  rawToggle.style.display = '';
+
+  if (!r.jobId) {
+    resultTitle.textContent = '转写结果（未整理）';
+    resultText.textContent = r.raw;
+    return;
+  }
+
+  resultTitle.textContent = '整理中…';
+  const es = new EventSource(`/api/ai/stream/${r.jobId}`);
+  activeStream = es;
+  activeJob = r.jobId;
+  es.addEventListener('delta', e => { resultText.textContent += JSON.parse(e.data); });
+  es.addEventListener('done', () => {
+    resultTitle.textContent = '语音整理';
+    es.close(); activeStream = null; activeJob = null;
+  });
+  es.addEventListener('error', () => {
+    // Cleanup failed, but the transcript is still good: show it rather
+    // than losing what the user just said.
+    resultTitle.textContent = '整理失败，已保留原始转写';
+    if (!resultText.textContent) resultText.textContent = r.raw;
+    es.close(); activeStream = null; activeJob = null;
+  });
+}
+
+rawToggle.onclick = () => {
+  rawText.classList.toggle('show');
+  rawToggle.textContent = rawText.classList.contains('show')
+    ? '收起原始转写' : '查看原始转写';
+};
+
+micBtn.onclick = () => recording ? stopRecording() : startRecording();
+
+// Push-to-talk: hold the key, speak, release. Matches how dictation
+// actually feels better than a toggle does.
+addEventListener('keydown', e => {
+  if (e.code === 'F2' && !e.repeat && current) { e.preventDefault(); startRecording(); }
+});
+addEventListener('keyup', e => {
+  if (e.code === 'F2') { e.preventDefault(); stopRecording(); }
+});
+
+micBtn.oncontextmenu = e => { e.preventDefault(); loadVoice().then(() => vDlg.showModal()); };
+
+$('#openVoice').onclick = async () => {
+  dlg.close();
+  await loadVoice();
+  vDlg.showModal();
+};
+
 loadThemes();
 loadAI();
+loadVoice();
 refreshList();
 </script>
 </body>
