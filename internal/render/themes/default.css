@@ -1,0 +1,72 @@
+/* Default theme. Rules are written against .cw-root so they can be scoped
+   in preview and inlined for WeChat without leaking into the app chrome. */
+.cw-root {
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 16px;
+  line-height: 1.75;
+  color: #2c3e50;
+  word-break: break-word;
+}
+.cw-root h1, .cw-root h2, .cw-root h3, .cw-root h4 {
+  font-weight: 600;
+  line-height: 1.35;
+  margin: 1.6em 0 0.7em;
+  color: #1a202c;
+}
+.cw-root h1 { font-size: 1.5em; text-align: center; }
+.cw-root h2 {
+  font-size: 1.3em;
+  border-bottom: 2px solid #c2410c;
+  padding-bottom: 0.3em;
+}
+.cw-root h3 { font-size: 1.15em; }
+.cw-root h4 { font-size: 1em; }
+.cw-root p { margin: 1.1em 0; }
+.cw-root a { color: #c2410c; text-decoration: none; }
+.cw-root strong { font-weight: 600; color: #1a202c; }
+.cw-root ul, .cw-root ol { margin: 1.1em 0; padding-left: 1.6em; }
+.cw-root li { margin: 0.45em 0; }
+.cw-root blockquote {
+  margin: 1.2em 0;
+  padding: 0.8em 1em;
+  border-left: 4px solid #c2410c;
+  background: #fdf6f3;
+  color: #52525b;
+}
+.cw-root blockquote p { margin: 0.4em 0; }
+.cw-root code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.88em;
+  background: #f4f4f5;
+  padding: 0.15em 0.4em;
+  border-radius: 3px;
+  color: #c2410c;
+}
+.cw-root pre {
+  margin: 1.2em 0;
+  padding: 1em;
+  background: #f8f8f8;
+  border-radius: 6px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+.cw-root pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: 0.85em;
+}
+.cw-root img { max-width: 100%; border-radius: 4px; }
+.cw-root table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.2em 0;
+  font-size: 0.95em;
+}
+.cw-root th, .cw-root td {
+  border: 1px solid #e4e4e7;
+  padding: 0.55em 0.8em;
+  text-align: left;
+}
+.cw-root th { background: #fafafa; font-weight: 600; }
+.cw-root hr { border: 0; border-top: 1px solid #e4e4e7; margin: 2em 0; }

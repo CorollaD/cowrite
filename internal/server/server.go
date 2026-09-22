@@ -10,6 +10,7 @@ import (
 
 	"github.com/corollad/cowrite/internal/config"
 	"github.com/corollad/cowrite/internal/index"
+	"github.com/corollad/cowrite/internal/render"
 	"github.com/corollad/cowrite/internal/store"
 	"github.com/corollad/cowrite/internal/workspace"
 	"github.com/go-chi/chi/v5"
@@ -25,10 +26,12 @@ type Server struct {
 	db  *store.DB
 	ix  *index.Index
 	log *slog.Logger
+
+	renderer *render.Renderer
 }
 
 func New(cfg config.Config, ws *workspace.Workspace, db *store.DB, ix *index.Index, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, ws: ws, db: db, ix: ix, log: log}
+	return &Server{cfg: cfg, ws: ws, db: db, ix: ix, log: log, renderer: render.New()}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -42,6 +45,8 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/posts/{id}", s.handleGetPost)
 		r.Put("/posts/{id}", s.handleUpdatePost)
 		r.Delete("/posts/{id}", s.handleDeletePost)
+		r.Post("/render", s.handleRender)
+		r.Get("/themes", s.handleListThemes)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		})

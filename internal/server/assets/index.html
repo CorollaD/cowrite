@@ -50,11 +50,31 @@
     display: flex; align-items: center; gap: 14px;
     font-size: 13px; color: var(--muted); background: var(--panel);
   }
+  #panes { flex: 1; display: flex; min-height: 0; }
   #editor {
-    flex: 1; width: 100%; border: 0; outline: 0; resize: none;
+    flex: 1; width: 50%; border: 0; outline: 0; resize: none;
     padding: 28px 32px; background: var(--bg); color: var(--text);
     font: 15px/1.75 ui-monospace, "SF Mono", Menlo, monospace;
   }
+  #preview {
+    flex: 1; width: 50%; border: 0; border-left: 1px solid var(--border);
+    background: #fff;
+  }
+  body.solo #preview { display: none; }
+  body.solo #editor { width: 100%; }
+  #bar select, #bar .spacer { font: inherit; }
+  #bar select {
+    background: transparent; color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px;
+  }
+  #bar .spacer { flex: 1; }
+  #toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 9px 18px;
+    border-radius: 7px; font-size: 13px; opacity: 0;
+    transition: opacity .2s; pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
   #empty {
     flex: 1; display: grid; place-items: center; color: var(--muted);
   }
@@ -67,16 +87,32 @@
     <div id="list"></div>
   </aside>
   <main id="main">
-    <div id="bar"><span id="status">选择或新建一篇文章</span><span id="words"></span></div>
+    <div id="bar">
+      <span id="status">选择或新建一篇文章</span>
+      <span id="words"></span>
+      <span class="spacer"></span>
+      <select id="theme" title="预览主题"></select>
+      <button id="toggle" title="切换预览">预览</button>
+      <button id="copy" title="复制为公众号格式">复制公众号</button>
+    </div>
     <div id="empty">← 从左侧开始</div>
-    <textarea id="editor" spellcheck="false" style="display:none"
-              placeholder="# 标题&#10;&#10;开始写…"></textarea>
+    <div id="panes" style="display:none">
+      <textarea id="editor" spellcheck="false"
+                placeholder="# 标题&#10;&#10;开始写…"></textarea>
+      <iframe id="preview" sandbox=""></iframe>
+    </div>
+  </main>
+  <div id="toast"></div>
   </main>
 
 <script type="module">
 const $ = s => document.querySelector(s);
 const listEl = $('#list'), editor = $('#editor'), statusEl = $('#status'),
-      wordsEl = $('#words'), emptyEl = $('#empty');
+      wordsEl = $('#words'), emptyEl = $('#empty'), panesEl = $('#panes'),
+      previewEl = $('#preview'), themeSel = $('#theme'), toastEl = $('#toast');
+
+let theme = localStorage.getItem('cw.theme') || 'default';
+let renderTimer = null;
 
 let current = null;   // { id, hash }
 let saveTimer = null;
@@ -116,11 +152,12 @@ async function open(id) {
   const p = await api('GET', `/posts/${id}`);
   current = { id: p.id, hash: p.hash };
   editor.value = p.body;
-  editor.style.display = '';
+  panesEl.style.display = '';
   emptyEl.style.display = 'none';
   dirty = false;
   setStatus('已保存');
   updateWords();
+  renderPreview();
   refreshList();
 }
 
@@ -168,12 +205,35 @@ function setStatus(text, warn = false) {
 }
 function updateWords() { wordsEl.textContent = countWords(editor.value) + ' 字'; }
 
+async function renderPreview() {
+  if (panesEl.style.display === 'none') return;
+  try {
+    const r = await api('POST', '/render',
+      { body: editor.value, profile: 'preview', theme });
+    // srcdoc + sandbox: post styles cannot leak into the app, and post
+    // content cannot run script against it.
+    previewEl.srcdoc =
+      `<!doctype html><meta charset="utf-8">` +
+      `<style>body{margin:0;padding:26px 30px;}${r.css}</style>` + r.html;
+  } catch (err) {
+    setStatus('预览失败：' + err.message, true);
+  }
+}
+
+function toast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), 1800);
+}
+
 editor.addEventListener('input', () => {
   dirty = true;
   setStatus('未保存');
   updateWords();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(save, 800);   // debounce
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(renderPreview, 250);
 });
 editor.addEventListener('blur', save);
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
@@ -186,6 +246,47 @@ $('#new').onclick = async () => {
   editor.focus();
 };
 
+$('#toggle').onclick = () => {
+  document.body.classList.toggle('solo');
+  renderPreview();
+};
+
+themeSel.onchange = () => {
+  theme = themeSel.value;
+  localStorage.setItem('cw.theme', theme);
+  renderPreview();
+};
+
+$('#copy').onclick = async () => {
+  if (!current) return;
+  try {
+    const r = await api('POST', '/render',
+      { body: editor.value, profile: 'wechat', theme });
+    // Copy as text/html so the styling survives the paste into WeChat.
+    await navigator.clipboard.write([new ClipboardItem({
+      'text/html': new Blob([r.html], { type: 'text/html' }),
+      'text/plain': new Blob([r.html], { type: 'text/plain' }),
+    })]);
+    toast('已复制，去公众号编辑器粘贴');
+  } catch (err) {
+    toast('复制失败：' + err.message);
+  }
+};
+
+async function loadThemes() {
+  const list = await api('GET', '/themes');
+  themeSel.innerHTML = '';
+  for (const t of list) {
+    const o = document.createElement('option');
+    o.value = t.id;
+    o.textContent = t.name;
+    themeSel.append(o);
+  }
+  if (!list.some(t => t.id === theme)) theme = 'default';
+  themeSel.value = theme;
+}
+
+loadThemes();
 refreshList();
 </script>
 </body>
