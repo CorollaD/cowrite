@@ -174,3 +174,25 @@ func TestDetectLocalHandlesNothingRunning(t *testing.T) {
 		t.Errorf("DetectLocal took %v; startup must not block", elapsed)
 	}
 }
+
+// Document-scope commands describe the article rather than replacing it.
+// Inserting a list of title candidates over the body would destroy the post,
+// so scope is what the UI keys "replace" versus "copy" off.
+func TestDocumentScopeCommandsAreNotReplacements(t *testing.T) {
+	for _, id := range []string{"title", "summary"} {
+		cmd, ok := FindCommand(id)
+		if !ok {
+			t.Fatalf("command %q missing", id)
+		}
+		if cmd.Scope != ScopeDocument {
+			t.Errorf("%s scope = %q, want document", id, cmd.Scope)
+		}
+	}
+	// Polish and continue do rewrite text in place.
+	for _, id := range []string{"polish", "continue"} {
+		cmd, _ := FindCommand(id)
+		if cmd.Scope == ScopeDocument {
+			t.Errorf("%s should act on a selection or the cursor, not the whole document", id)
+		}
+	}
+}

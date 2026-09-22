@@ -610,6 +610,7 @@ async function runCommand(id) {
   lastScope = scope;
 
   resultTitle.textContent = cmd.label + ' 生成中…';
+  $('#resultInsert').textContent = scope.readonly ? '复制' : '采用';
   resultText.textContent = '';
   resultEl.classList.add('show');
 
@@ -649,10 +650,23 @@ $('#resultDismiss').onclick = () => { stopStream(); resultEl.classList.remove('s
 
 // Insert replaces the range the command read, so the user sees the result
 // applied exactly where it came from rather than dumped at the cursor.
-$('#resultInsert').onclick = () => {
+$('#resultInsert').onclick = async () => {
   stopStream();
   const out = resultText.textContent;
   if (!out || !lastScope) return;
+
+  // Titles and summaries describe the article; replacing the body with
+  // them would destroy the post.
+  if (lastScope.readonly) {
+    try {
+      await navigator.clipboard.writeText(out);
+      toast('已复制到剪贴板');
+    } catch {
+      toast('请手动复制上面的内容');
+    }
+    resultEl.classList.remove('show');
+    return;
+  }
   const v = editor.value;
   editor.value = lastScope.append
     ? v.slice(0, lastScope.start) + out + v.slice(lastScope.start)
@@ -757,6 +771,7 @@ async function sendAudio(blob) {
   if (sel.trim()) fd.append('selection', sel);
 
   resultTitle.textContent = '转写中…';
+  $('#resultInsert').textContent = '采用';
   resultText.textContent = '';
   rawText.textContent = '';
   rawText.classList.remove('show');
