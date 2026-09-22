@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>cowrite</title>
+<style>
+  :root {
+    --bg: #fbfbfa; --panel: #fff; --border: #e6e4e1;
+    --text: #23211e; --muted: #86817a; --accent: #c2410c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a1917; --panel: #232120; --border: #38342f;
+      --text: #ece9e4; --muted: #948d84; --accent: #fb923c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex;
+    background: var(--bg); color: var(--text);
+    font: 15px/1.6 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  #sidebar {
+    width: 260px; flex-shrink: 0; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; background: var(--panel);
+  }
+  #sidebar header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #sidebar h1 { font-size: 15px; margin: 0; letter-spacing: .3px; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 6px;
+    border: 1px solid var(--border); background: transparent; color: var(--text);
+    padding: 4px 10px;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  #list { overflow-y: auto; flex: 1; }
+  .item { padding: 11px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .item:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+  .item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .item .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .m { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  #bar {
+    padding: 9px 18px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px;
+    font-size: 13px; color: var(--muted); background: var(--panel);
+  }
+  #editor {
+    flex: 1; width: 100%; border: 0; outline: 0; resize: none;
+    padding: 28px 32px; background: var(--bg); color: var(--text);
+    font: 15px/1.75 ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  #empty {
+    flex: 1; display: grid; place-items: center; color: var(--muted);
+  }
+  .warn { color: var(--accent); }
+</style>
+</head>
+<body>
+  <aside id="sidebar">
+    <header><h1>cowrite</h1><button id="new">新建</button></header>
+    <div id="list"></div>
+  </aside>
+  <main id="main">
+    <div id="bar"><span id="status">选择或新建一篇文章</span><span id="words"></span></div>
+    <div id="empty">← 从左侧开始</div>
+    <textarea id="editor" spellcheck="false" style="display:none"
+              placeholder="# 标题&#10;&#10;开始写…"></textarea>
+  </main>
+
+<script type="module">
+const $ = s => document.querySelector(s);
+const listEl = $('#list'), editor = $('#editor'), statusEl = $('#status'),
+      wordsEl = $('#words'), emptyEl = $('#empty');
+
+let current = null;   // { id, hash }
+let saveTimer = null;
+let dirty = false;
+
+const api = async (method, path, body) => {
+  const res = await fetch('/api' + path, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.error || res.statusText), { status: res.status, data });
+  return data;
+};
+
+const countWords = t => (t.match(/[一-鿿]|[A-Za-z0-9]+/g) || []).length;
+
+async function refreshList() {
+  const posts = await api('GET', '/posts');
+  listEl.innerHTML = '';
+  for (const p of posts) {
+    const el = document.createElement('div');
+    el.className = 'item' + (current?.id === p.id ? ' active' : '');
+    el.innerHTML = `<div class="t"></div><div class="m"></div>`;
+    el.querySelector('.t').textContent = p.title || '无标题';
+    el.querySelector('.m').textContent =
+      `${p.wordCount} 字 · ${new Date(p.updatedAt * 1000).toLocaleDateString('zh-CN')}`;
+    el.onclick = () => open(p.id);
+    listEl.append(el);
+  }
+}
+
+async function open(id) {
+  if (dirty) await save();
+  const p = await api('GET', `/posts/${id}`);
+  current = { id: p.id, hash: p.hash };
+  editor.value = p.body;
+  editor.style.display = '';
+  emptyEl.style.display = 'none';
+  dirty = false;
+  setStatus('已保存');
+  updateWords();
+  refreshList();
+}
+
+async function save() {
+  if (!current || !dirty) return;
+  clearTimeout(saveTimer);
+  setStatus('保存中…');
+  try {
+    const p = await api('PUT', `/posts/${current.id}`, {
+      body: editor.value,
+      baseHash: current.hash,
+    });
+    current.hash = p.hash;
+    dirty = false;
+    setStatus('已保存');
+    refreshList();
+  } catch (err) {
+    if (err.status === 409) {
+      // The file changed underneath us. Never silently overwrite.
+      setStatus('文件已在外部修改', true);
+      const keepMine = confirm(
+        '这个文件在别处被改过了。\n\n' +
+        '确定 = 用编辑器里的版本覆盖磁盘\n' +
+        '取消 = 丢弃编辑器内容，载入磁盘版本'
+      );
+      if (keepMine) {
+        current.hash = err.data.diskHash;
+        dirty = true;
+        return save();
+      }
+      editor.value = err.data.diskBody;
+      current.hash = err.data.diskHash;
+      dirty = false;
+      setStatus('已载入磁盘版本');
+      updateWords();
+    } else {
+      setStatus('保存失败：' + err.message, true);
+    }
+  }
+}
+
+function setStatus(text, warn = false) {
+  statusEl.textContent = text;
+  statusEl.className = warn ? 'warn' : '';
+}
+function updateWords() { wordsEl.textContent = countWords(editor.value) + ' 字'; }
+
+editor.addEventListener('input', () => {
+  dirty = true;
+  setStatus('未保存');
+  updateWords();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(save, 800);   // debounce
+});
+editor.addEventListener('blur', save);
+document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+addEventListener('beforeunload', e => { if (dirty) { save(); e.preventDefault(); } });
+
+$('#new').onclick = async () => {
+  const p = await api('POST', '/posts', { title: '', body: '# 新文章\n\n' });
+  await refreshList();
+  await open(p.id);
+  editor.focus();
+};
+
+refreshList();
+</script>
+</body>
+</html>
