@@ -19,6 +19,9 @@ import (
 	"github.com/corollad/cowrite/internal/workspace"
 )
 
+// version is set at build time via -ldflags.
+var version = "dev"
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "cowrite: %v\n", err)
@@ -35,7 +38,13 @@ func run() error {
 	flag.IntVar(&cfg.Port, "port", cfg.Port, "port to listen on")
 	flag.StringVar(&cfg.Workspace, "workspace", cfg.Workspace, "directory holding your markdown posts")
 	flag.BoolVar(&cfg.Dev, "dev", false, "serve the web UI from disk instead of the embedded copy")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("cowrite", version)
+		return nil
+	}
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
 

@@ -117,8 +117,8 @@ func TestPruneKeepsRecentAndManual(t *testing.T) {
 		}
 	}
 
-	add(store.KindAuto, 1*time.Hour, "recent")             // within 24h: kept
-	add(store.KindManual, 40*24*time.Hour, "old-manual")   // manual: kept forever
+	add(store.KindAuto, 1*time.Hour, "recent")           // within 24h: kept
+	add(store.KindManual, 40*24*time.Hour, "old-manual") // manual: kept forever
 	// Three automatic snapshots in the same old hour: only one survives.
 	add(store.KindAuto, 48*time.Hour, "old-1")
 	add(store.KindAuto, 48*time.Hour+time.Minute, "old-2")

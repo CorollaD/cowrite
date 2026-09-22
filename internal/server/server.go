@@ -57,8 +57,10 @@ func (s *Server) Handler() http.Handler {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/posts", s.handleListPosts)
+		r.Get("/search", s.handleSearch)
 		r.Post("/posts", s.handleCreatePost)
 		r.Get("/posts/{id}", s.handleGetPost)
+		r.Get("/posts/{id}/export", s.handleExport)
 		r.Get("/posts/{id}/versions", s.handleListVersions)
 		r.Post("/posts/{id}/versions", s.handleSnapshot)
 		r.Get("/posts/{id}/publishes", s.handleListPublishRecords)

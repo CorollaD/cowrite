@@ -38,7 +38,16 @@
     padding: 4px 10px;
   }
   button:hover { border-color: var(--accent); color: var(--accent); }
+  #searchBox { padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  #search {
+    width: 100%; box-sizing: border-box; font: inherit; padding: 5px 8px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--text);
+  }
   #list { overflow-y: auto; flex: 1; }
+  .item .snip { font-size: 12px; color: var(--muted); margin-top: 4px;
+                display: -webkit-box; -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical; overflow: hidden; }
   .item { padding: 11px 16px; border-bottom: 1px solid var(--border); cursor: pointer; }
   .item:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); }
   .item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
@@ -144,6 +153,7 @@
 <body>
   <aside id="sidebar">
     <header><h1>cowrite</h1><button id="new">新建</button></header>
+    <div id="searchBox"><input id="search" type="search" placeholder="搜索全部文章…"></div>
     <div id="list"></div>
   </aside>
   <main id="main">
@@ -1075,6 +1085,47 @@ events.addEventListener('change', async e => {
   renderPreview();
   setStatus('已载入外部修改');
 });
+
+// ---- 搜索 ---------------------------------------------------------------
+
+const searchEl = $('#search');
+let searchTimer = null;
+
+async function runSearch(q) {
+  if (!q.trim()) { refreshList(); return; }
+  const hits = await api('GET', `/search?q=${encodeURIComponent(q)}`);
+  listEl.innerHTML = '';
+  if (!hits.length) {
+    listEl.innerHTML = '<div class="item"><div class="m">没有匹配的文章</div></div>';
+    return;
+  }
+  for (const h of hits) {
+    const el = document.createElement('div');
+    el.className = 'item' + (current?.id === h.postId ? ' active' : '');
+    el.innerHTML = '<div class="t"></div><div class="snip"></div>';
+    el.querySelector('.t').textContent = h.title || '无标题';
+    el.querySelector('.snip').textContent = h.snippet;
+    el.onclick = () => open(h.postId);
+    listEl.append(el);
+  }
+}
+
+searchEl.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => runSearch(searchEl.value), 200);
+});
+searchEl.addEventListener('search', () => runSearch(searchEl.value));
+
+// ---- 导出 ---------------------------------------------------------------
+
+$('#export').onclick = async () => {
+  if (!current) { toast('先打开一篇文章'); return; }
+  if (dirty) await save();
+  const fmt = confirm('确定 = 导出 HTML（带样式，可直接打开）\n取消 = 导出 Markdown 源文件')
+    ? 'html' : 'md';
+  window.location.href =
+    `/api/posts/${current.id}/export?format=${fmt}&theme=${encodeURIComponent(theme)}`;
+};
 
 loadThemes();
 loadAI();

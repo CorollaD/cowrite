@@ -62,6 +62,9 @@ func (ix *Index) Sync() error {
 		if err := ix.db.SoftDeletePost(p.ID); err != nil {
 			ix.log.Warn("soft delete failed", "path", relPath, "err", err)
 		}
+		if err := ix.db.RemoveFromSearch(p.ID); err != nil {
+			ix.log.Warn("search removal failed", "path", relPath, "err", err)
+		}
 	}
 	return nil
 }
@@ -95,6 +98,10 @@ func (ix *Index) upsert(e workspace.Entry) error {
 	updated := post.Meta.Updated
 	if updated.IsZero() {
 		updated = e.MTime
+	}
+
+	if err := ix.db.IndexForSearch(post.Meta.ID, post.Meta.Title, post.Body); err != nil {
+		ix.log.Warn("search index failed", "post", e.RelPath, "err", err)
 	}
 
 	return ix.db.UpsertPost(&store.Post{
