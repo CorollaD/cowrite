@@ -6,11 +6,13 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"github.com/corollad/cowrite/internal/config"
 	"github.com/corollad/cowrite/internal/index"
 	"github.com/corollad/cowrite/internal/render"
+	"github.com/corollad/cowrite/internal/secret"
 	"github.com/corollad/cowrite/internal/store"
 	"github.com/corollad/cowrite/internal/workspace"
 	"github.com/go-chi/chi/v5"
@@ -28,16 +30,22 @@ type Server struct {
 	log *slog.Logger
 
 	renderer *render.Renderer
+	secrets  *secret.Store
+	jobs     *jobRegistry
 }
 
 func New(cfg config.Config, ws *workspace.Workspace, db *store.DB, ix *index.Index, log *slog.Logger) *Server {
-	return &Server{cfg: cfg, ws: ws, db: db, ix: ix, log: log, renderer: render.New()}
+	return &Server{
+		cfg: cfg, ws: ws, db: db, ix: ix, log: log,
+		renderer: render.New(),
+		secrets:  secret.New(filepath.Join(cfg.Workspace, ".cowrite")),
+		jobs:     newJobRegistry(),
+	}
 }
 
 func (s *Server) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Timeout(30 * time.Second))
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/posts", s.handleListPosts)
@@ -46,6 +54,15 @@ func (s *Server) Handler() http.Handler {
 		r.Put("/posts/{id}", s.handleUpdatePost)
 		r.Delete("/posts/{id}", s.handleDeletePost)
 		r.Post("/render", s.handleRender)
+		r.Route("/ai", func(r chi.Router) {
+			r.Get("/config", s.handleGetAIConfig)
+			r.Put("/config", s.handleSaveAIConfig)
+			r.Get("/detect", s.handleDetectAI)
+			r.Get("/models", s.handleListModels)
+			r.Post("/run", s.handleAIRun)
+			r.Get("/stream/{id}", s.handleAIStream)
+			r.Delete("/stream/{id}", s.handleAICancel)
+		})
 		r.Get("/themes", s.handleListThemes)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

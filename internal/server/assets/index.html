@@ -68,6 +68,34 @@
     border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px;
   }
   #bar .spacer { flex: 1; }
+  #ai { display: flex; gap: 6px; }
+  #ai button[disabled] { opacity: .4; cursor: default; }
+  dialog {
+    border: 1px solid var(--border); border-radius: 10px; padding: 0;
+    background: var(--panel); color: var(--text); width: 440px; max-width: 92vw;
+  }
+  dialog::backdrop { background: rgba(0,0,0,.35); }
+  .dlg-body { padding: 20px 22px; display: flex; flex-direction: column; gap: 13px; }
+  .dlg-body h2 { margin: 0; font-size: 15px; }
+  .dlg-body label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+  .dlg-body input, .dlg-body select {
+    width: 100%; font: inherit; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  }
+  .dlg-note { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .dlg-actions { display: flex; justify-content: flex-end; gap: 8px; }
+  #result { position: fixed; inset: auto 0 0 0; display: none; }
+  #result.show { display: block; }
+  #result .inner {
+    max-width: 780px; margin: 0 auto 20px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px;
+    box-shadow: 0 8px 28px rgba(0,0,0,.14);
+  }
+  #result h3 { margin: 0 0 9px; font-size: 13px; color: var(--muted); font-weight: 500; }
+  #resultText {
+    white-space: pre-wrap; max-height: 260px; overflow-y: auto;
+    font-size: 14px; line-height: 1.7; margin-bottom: 12px;
+  }
   #toast {
     position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
     background: var(--text); color: var(--bg); padding: 9px 18px;
@@ -91,6 +119,13 @@
       <span id="status">选择或新建一篇文章</span>
       <span id="words"></span>
       <span class="spacer"></span>
+      <span id="ai">
+        <button data-cmd="polish">润色</button>
+        <button data-cmd="continue">续写</button>
+        <button data-cmd="title">起标题</button>
+        <button data-cmd="summary">摘要</button>
+        <button id="aiSettings" title="AI 设置">⚙</button>
+      </span>
       <select id="theme" title="预览主题"></select>
       <button id="toggle" title="切换预览">预览</button>
       <button id="copy" title="复制为公众号格式">复制公众号</button>
@@ -102,6 +137,43 @@
       <iframe id="preview" sandbox=""></iframe>
     </div>
   </main>
+  <div id="result">
+    <div class="inner">
+      <h3 id="resultTitle">AI</h3>
+      <div id="resultText"></div>
+      <div class="dlg-actions">
+        <button id="resultStop">停止</button>
+        <button id="resultDismiss">丢弃</button>
+        <button id="resultInsert">采用</button>
+      </div>
+    </div>
+  </div>
+
+  <dialog id="aiDialog">
+    <form method="dialog" class="dlg-body">
+      <h2>AI 设置</h2>
+      <div>
+        <label for="provider">服务商</label>
+        <select id="provider"></select>
+      </div>
+      <div class="dlg-note" id="providerNote"></div>
+      <div>
+        <label for="apiKey">API Key</label>
+        <input id="apiKey" type="password" placeholder="留空则不修改已保存的 key">
+      </div>
+      <div>
+        <label for="model">模型</label>
+        <input id="model" list="modelList" placeholder="例如 deepseek-chat">
+        <datalist id="modelList"></datalist>
+      </div>
+      <div class="dlg-note">Key 存在系统钥匙串，不会写进工作区或索引，也不会回传浏览器。</div>
+      <div class="dlg-actions">
+        <button value="cancel">取消</button>
+        <button id="aiSave" value="save">保存</button>
+      </div>
+    </form>
+  </dialog>
+
   <div id="toast"></div>
   </main>
 
@@ -158,6 +230,7 @@ async function open(id) {
   setStatus('已保存');
   updateWords();
   renderPreview();
+  updateAIButtons();
   refreshList();
 }
 
@@ -286,7 +359,159 @@ async function loadThemes() {
   themeSel.value = theme;
 }
 
+// ---- AI ----------------------------------------------------------------
+
+const resultEl = $('#result'), resultText = $('#resultText'),
+      resultTitle = $('#resultTitle'), dlg = $('#aiDialog'),
+      providerSel = $('#provider'), providerNote = $('#providerNote'),
+      modelInput = $('#model'), modelList = $('#modelList'), apiKeyInput = $('#apiKey');
+
+let providers = [], commands = [], aiCfg = null;
+let activeStream = null, activeJob = null, lastScope = null;
+
+async function loadAI() {
+  const r = await api('GET', '/ai/config');
+  providers = r.providers; commands = r.commands; aiCfg = r.config;
+
+  providerSel.innerHTML = '';
+  for (const p of providers) {
+    const o = document.createElement('option');
+    o.value = p.id;
+    o.textContent = p.name + (p.free ? ' · 免费' : '');
+    providerSel.append(o);
+  }
+  if (aiCfg.providerId) providerSel.value = aiCfg.providerId;
+  showProviderNote();
+  modelInput.value = aiCfg.model || '';
+  updateAIButtons();
+}
+
+function showProviderNote() {
+  const p = providers.find(x => x.id === providerSel.value);
+  providerNote.textContent = p ? p.notes : '';
+  modelList.innerHTML = '';
+  for (const m of (p?.models || [])) {
+    const o = document.createElement('option');
+    o.value = m;
+    modelList.append(o);
+  }
+  if (p && !modelInput.value) modelInput.value = p.models?.[0] || '';
+  apiKeyInput.placeholder = p?.auth === 'none'
+    ? '本地服务，不需要 key'
+    : (aiCfg?.hasKey ? '已保存，留空则不修改' : '粘贴你的 API Key');
+}
+
+function updateAIButtons() {
+  const ready = aiCfg && aiCfg.baseURL && aiCfg.model;
+  for (const b of document.querySelectorAll('#ai button[data-cmd]')) {
+    b.disabled = !ready || !current;
+  }
+}
+
+providerSel.onchange = () => { modelInput.value = ''; showProviderNote(); };
+
+$('#aiSettings').onclick = async () => {
+  await loadAI();
+  dlg.showModal();
+};
+
+$('#aiSave').onclick = async () => {
+  // The dialog closes itself; save before it does.
+  try {
+    aiCfg = await api('PUT', '/ai/config', {
+      providerId: providerSel.value,
+      model: modelInput.value.trim(),
+      apiKey: apiKeyInput.value,
+    });
+    apiKeyInput.value = '';
+    updateAIButtons();
+    toast('已保存');
+  } catch (err) {
+    toast('保存失败：' + err.message);
+  }
+};
+
+// Pick the text a command runs on: its selection, the text before the
+// cursor, or the whole document.
+function textFor(scope) {
+  const sel = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+  if (scope === 'selection') {
+    return sel.trim()
+      ? { text: sel, start: editor.selectionStart, end: editor.selectionEnd }
+      : { text: editor.value, start: 0, end: editor.value.length };
+  }
+  if (scope === 'cursor') {
+    const end = editor.selectionEnd;
+    return { text: editor.value.slice(0, end), start: end, end, append: true };
+  }
+  return { text: editor.value, start: 0, end: editor.value.length, readonly: true };
+}
+
+async function runCommand(id) {
+  const cmd = commands.find(c => c.id === id);
+  if (!cmd) return;
+
+  const scope = textFor(cmd.scope);
+  if (!scope.text.trim()) { toast('没有可处理的文字'); return; }
+  lastScope = scope;
+
+  resultTitle.textContent = cmd.label + ' 生成中…';
+  resultText.textContent = '';
+  resultEl.classList.add('show');
+
+  try {
+    const { jobId } = await api('POST', '/ai/run', { command: id, text: scope.text });
+    activeJob = jobId;
+    const es = new EventSource(`/api/ai/stream/${jobId}`);
+    activeStream = es;
+
+    es.addEventListener('delta', e => { resultText.textContent += JSON.parse(e.data); });
+    es.addEventListener('done', () => {
+      resultTitle.textContent = cmd.label;
+      es.close(); activeStream = null; activeJob = null;
+    });
+    es.addEventListener('error', e => {
+      resultTitle.textContent = cmd.label + ' 失败';
+      if (e.data) resultText.textContent += '\n\n[' + e.data + ']';
+      es.close(); activeStream = null; activeJob = null;
+    });
+  } catch (err) {
+    resultTitle.textContent = cmd.label + ' 失败';
+    resultText.textContent = err.message;
+  }
+}
+
+for (const b of document.querySelectorAll('#ai button[data-cmd]')) {
+  b.onclick = () => runCommand(b.dataset.cmd);
+}
+
+function stopStream() {
+  if (activeStream) { activeStream.close(); activeStream = null; }
+  if (activeJob) { api('DELETE', `/ai/stream/${activeJob}`).catch(() => {}); activeJob = null; }
+}
+
+$('#resultStop').onclick = () => { stopStream(); resultTitle.textContent = '已停止'; };
+$('#resultDismiss').onclick = () => { stopStream(); resultEl.classList.remove('show'); };
+
+// Insert replaces the range the command read, so the user sees the result
+// applied exactly where it came from rather than dumped at the cursor.
+$('#resultInsert').onclick = () => {
+  stopStream();
+  const out = resultText.textContent;
+  if (!out || !lastScope) return;
+  const v = editor.value;
+  editor.value = lastScope.append
+    ? v.slice(0, lastScope.start) + out + v.slice(lastScope.start)
+    : v.slice(0, lastScope.start) + out + v.slice(lastScope.end);
+  resultEl.classList.remove('show');
+  dirty = true;
+  updateWords();
+  renderPreview();
+  save();
+};
+
 loadThemes();
+loadAI();
 refreshList();
 </script>
 </body>
