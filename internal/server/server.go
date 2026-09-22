@@ -58,6 +58,8 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/posts/{id}", s.handleGetPost)
 		r.Get("/posts/{id}/versions", s.handleListVersions)
 		r.Post("/posts/{id}/versions", s.handleSnapshot)
+		r.Get("/posts/{id}/publishes", s.handleListPublishRecords)
+		r.Post("/posts/{id}/publish/wechat", s.handlePublishWeChat)
 		r.Get("/posts/{id}/versions/{versionId}", s.handleGetVersion)
 		r.Post("/posts/{id}/versions/{versionId}/restore", s.handleRestoreVersion)
 		r.Put("/posts/{id}", s.handleUpdatePost)
@@ -72,6 +74,11 @@ func (s *Server) Handler() http.Handler {
 			r.Post("/run", s.handleAIRun)
 			r.Get("/stream/{id}", s.handleAIStream)
 			r.Delete("/stream/{id}", s.handleAICancel)
+		})
+		r.Route("/publish", func(r chi.Router) {
+			r.Get("/config", s.handleGetPublishConfig)
+			r.Put("/config", s.handleSavePublishConfig)
+			r.Post("/wechat/validate", s.handleValidateWeChat)
 		})
 		r.Route("/voice", func(r chi.Router) {
 			r.Get("/config", s.handleGetVoiceConfig)

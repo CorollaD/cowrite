@@ -158,6 +158,7 @@
         <button data-cmd="summary">摘要</button>
         <button id="mic" title="按住说话（或点击开始/停止）">🎤</button>
         <button id="hist" title="版本历史">🕘</button>
+        <button id="pub" title="发布到公众号">发布</button>
         <button id="aiSettings" title="AI 设置">⚙</button>
       </span>
       <select id="theme" title="预览主题"></select>
@@ -210,6 +211,47 @@
         <button id="aiSave" value="save">保存</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="pubDialog">
+    <div class="dlg-body">
+      <h2>发布到微信公众号</h2>
+      <div id="pubSetup">
+        <div>
+          <label for="wxAppId">AppID</label>
+          <input id="wxAppId" placeholder="wx...">
+        </div>
+        <div>
+          <label for="wxSecret">AppSecret</label>
+          <input id="wxSecret" type="password" placeholder="留空则不修改">
+        </div>
+        <div>
+          <label for="wxAuthor">作者署名</label>
+          <input id="wxAuthor" placeholder="可留空">
+        </div>
+        <div class="dlg-note">
+          需要已认证的订阅号或服务号。公众号后台要把本机公网 IP 加进
+          「设置与开发 → 基本配置 → IP 白名单」，家用宽带 IP 变动后需要重新添加。
+        </div>
+      </div>
+      <div>
+        <label for="pubDigest">摘要（最多 120 字，留空则不填）</label>
+        <textarea id="pubDigest" placeholder="也可以先用 AI 的「摘要」命令生成"></textarea>
+      </div>
+      <div class="dlg-note" id="pubNote">
+        文章会进入<strong>草稿箱</strong>，不会直接群发。最后一步请到公众号后台确认后再发。<br>
+        公众号要求必须有封面图：在文章 front matter 里写
+        <code>cover: 文件名.png</code>，图片放在文章同一个目录下。
+      </div>
+      <div id="pubRecords"></div>
+      <div class="dlg-actions">
+        <button id="pubSave" type="button">保存配置</button>
+        <button id="pubTest" type="button">测试连接</button>
+        <span style="flex:1"></span>
+        <button id="pubGo" type="button">发到草稿箱</button>
+        <button id="pubClose" type="button">关闭</button>
+      </div>
+    </div>
   </dialog>
 
   <dialog id="histDialog">
@@ -851,6 +893,80 @@ $('#histRestore').onclick = async () => {
     toast('已恢复（当前内容也存了快照）');
   } catch (err) {
     toast('恢复失败：' + err.message);
+  }
+};
+
+// ---- 发布 ---------------------------------------------------------------
+
+const pubDlg = $('#pubDialog'), wxAppId = $('#wxAppId'), wxSecret = $('#wxSecret'),
+      wxAuthor = $('#wxAuthor'), pubDigest = $('#pubDigest'), pubRecords = $('#pubRecords');
+
+async function loadPublish() {
+  const r = await api('GET', '/publish/config');
+  wxAppId.value = r.wechat.appId || '';
+  wxAuthor.value = r.wechat.author || '';
+  wxSecret.placeholder = r.wechat.hasSecret ? '已保存，留空则不修改' : '粘贴 AppSecret';
+
+  if (!current) { pubRecords.innerHTML = ''; return; }
+  const recs = await api('GET', `/posts/${current.id}/publishes`);
+  pubRecords.innerHTML = recs.length
+    ? '<div class="dlg-note">最近发布：' + recs.slice(0, 3).map(x =>
+        `${new Date(x.createdAt * 1000).toLocaleString('zh-CN')} · ` +
+        (x.status === 'failed' ? '失败' : '已进草稿箱')).join('<br>') + '</div>'
+    : '';
+}
+
+$('#pub').onclick = async () => {
+  if (!current) { toast('先打开一篇文章'); return; }
+  if (dirty) await save();
+  await loadPublish();
+  pubDlg.showModal();
+};
+
+$('#pubClose').onclick = () => pubDlg.close();
+
+$('#pubSave').onclick = async () => {
+  try {
+    await api('PUT', '/publish/config', {
+      appId: wxAppId.value.trim(),
+      author: wxAuthor.value.trim(),
+      appSecret: wxSecret.value,
+    });
+    wxSecret.value = '';
+    await loadPublish();
+    toast('已保存');
+  } catch (err) {
+    toast('保存失败：' + err.message);
+  }
+};
+
+$('#pubTest').onclick = async () => {
+  toast('测试中…');
+  try {
+    await api('POST', '/publish/wechat/validate');
+    toast('连接正常');
+  } catch (err) {
+    toast(err.message);
+  }
+};
+
+$('#pubGo').onclick = async () => {
+  const btn = $('#pubGo');
+  btn.disabled = true;
+  btn.textContent = '发送中…';
+  try {
+    const r = await api('POST', `/posts/${current.id}/publish/wechat`, {
+      digest: pubDigest.value.trim(),
+      theme,
+    });
+    await loadPublish();
+    toast('已进草稿箱，去公众号后台确认后群发');
+    if (r.remoteUrl) window.open(r.remoteUrl, '_blank');
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '发到草稿箱';
   }
 };
 
