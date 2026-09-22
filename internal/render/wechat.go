@@ -1,7 +1,9 @@
 package render
 
 import (
+	"encoding/base64"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/vanng822/go-premailer/premailer"
@@ -62,7 +64,10 @@ func ToWeChat(body string, theme Theme) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return cleaned, nil
+	// WeChat's editor drops inline <svg>, so formulas and diagrams have to
+	// travel as images. A data URI keeps them self-contained; the editor
+	// re-hosts them on its own CDN when the draft is saved.
+	return svgToImage(cleaned), nil
 }
 
 // sanitizeWeChat rewrites the inlined document into WeChat-safe markup.
@@ -85,6 +90,24 @@ func sanitizeWeChat(doc string) (string, error) {
 		}
 	}
 	return sb.String(), nil
+}
+
+var svgRe = regexp.MustCompile(`(?s)<svg\b.*?</svg>`)
+
+// svgToImage rewrites each inline SVG as an <img> with a data URI.
+func svgToImage(in string) string {
+	return svgRe.ReplaceAllStringFunc(in, func(svg string) string {
+		encoded := base64.StdEncoding.EncodeToString([]byte(svg))
+		// Oversized data URIs are worse than a missing image; leave very
+		// large diagrams as-is so the failure is visible rather than a
+		// silently broken article.
+		if len(encoded) > 1<<20 {
+			return svg
+		}
+		return fmt.Sprintf(
+			`<img src="data:image/svg+xml;base64,%s" style="max-width: 100%%"/>`,
+			encoded)
+	})
 }
 
 func findBody(n *html.Node) *html.Node {

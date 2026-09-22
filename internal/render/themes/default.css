@@ -70,3 +70,7 @@
 }
 .cw-root th { background: #fafafa; font-weight: 600; }
 .cw-root hr { border: 0; border-top: 1px solid #e4e4e7; margin: 2em 0; }
+.cw-diagram { margin: 1.4em 0; text-align: center; overflow-x: auto; }
+.cw-diagram svg { max-width: 100%; height: auto; }
+.cw-math-display { display: block; margin: 1.3em 0; text-align: center; }
+.cw-math-inline svg { vertical-align: -0.25em; }

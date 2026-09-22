@@ -28,6 +28,8 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
+	github.com/go-opentype/opentype v0.12.0 // indirect
+	github.com/go-tex/math v0.31.0 // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
 	github.com/inbucket/html2text v1.0.0 // indirect
@@ -51,6 +53,7 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/vanng822/css v1.0.1 // indirect
 	github.com/zalando/go-keyring v0.2.8 // indirect
+	github.com/zkrebbekx/go-mermaid v0.1.6 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect

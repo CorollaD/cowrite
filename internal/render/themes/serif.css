@@ -49,3 +49,7 @@
 .cw-root th, .cw-root td { border: 1px solid #e7e5e4; padding: 0.55em 0.8em; }
 .cw-root th { background: #faf9f7; font-weight: 700; }
 .cw-root hr { border: 0; border-top: 1px solid #e7e5e4; margin: 2.2em 0; }
+.cw-diagram { margin: 1.4em 0; text-align: center; overflow-x: auto; }
+.cw-diagram svg { max-width: 100%; height: auto; }
+.cw-math-display { display: block; margin: 1.3em 0; text-align: center; }
+.cw-math-inline svg { vertical-align: -0.25em; }

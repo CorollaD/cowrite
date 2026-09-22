@@ -35,9 +35,13 @@ github.com/fsnotify/fsnotify v1.10.1 h1:b0/UzAf9yR5rhf3RPm9gf3ehBPpf0oZKIjtpKrx5
 github.com/fsnotify/fsnotify v1.10.1/go.mod h1:TLheqan6HD6GBK6PrDWyDPBaEV8LspOxvPSjC+bVfgo=
 github.com/go-chi/chi/v5 v5.3.2 h1:5YQkICvTCSZ25hoRsyJazN0scjzKGiu4VAUc7H1o1nY=
 github.com/go-chi/chi/v5 v5.3.2/go.mod h1:R+tYY2hNuVUUjxoPtqUdgBqevM9s9njzkTLutVsOCto=
+github.com/go-opentype/opentype v0.12.0 h1:wBlcDi+3ZaNZXEt5z+Ixr11/cYYwi5W+jX6yTl/qr1I=
+github.com/go-opentype/opentype v0.12.0/go.mod h1:AOixevJf7XQaH7+WG+OMIOZEbYPXfMqklVk26Y6YTUU=
 github.com/go-sql-driver/mysql v1.8.1/go.mod h1:wEBSXgmK//2ZFJyE+qWnIsVGmvmEKlqwuVSjsCm7DZg=
 github.com/go-sql-driver/mysql v1.10.0 h1:Q+1LV8DkHJvSYAdR83XzuhDaTykuDx0l6fkXxoWCWfw=
 github.com/go-sql-driver/mysql v1.10.0/go.mod h1:M+cqaI7+xxXGG9swrdeUIoPG3Y3KCkF0pZej+SK+nWk=
+github.com/go-tex/math v0.31.0 h1:vMXTE4ZxDtMcG7x78T4HsqM6JHEzPCEBt61tUQvEyn0=
+github.com/go-tex/math v0.31.0/go.mod h1:SaB8XOWZXooetm1elSfY0UHwPbyhbditTZxbGoCzjXE=
 github.com/godbus/dbus/v5 v5.2.2 h1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=
 github.com/godbus/dbus/v5 v5.2.2/go.mod h1:3AAv2+hPq5rdnr5txxxRwiGjPXamgoIHgz9FPBfOp3c=
 github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3 h1:LMLX+LgTNWpfvCBdFebv6EsYotImrt/Ppc5cXIriCSo=
@@ -114,6 +118,8 @@ github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc h1:+
 github.com/yuin/goldmark-highlighting/v2 v2.0.0-20230729083705-37449abec8cc/go.mod h1:ovIvrum6DQJA4QsJSovrkC4saKHQVs7TvcaeO8AIl5I=
 github.com/zalando/go-keyring v0.2.8 h1:6sD/Ucpl7jNq10rM2pgqTs0sZ9V3qMrqfIIy5YPccHs=
 github.com/zalando/go-keyring v0.2.8/go.mod h1:tsMo+VpRq5NGyKfxoBVjCuMrG47yj8cmakZDO5QGii0=
+github.com/zkrebbekx/go-mermaid v0.1.6 h1:iNRHNNcADyyBYT8uSUbN9Of/3A28lko8nc2tOc8ue1o=
+github.com/zkrebbekx/go-mermaid v0.1.6/go.mod h1:kB4kIa9HE4LnTdCUh7AvqLCUbfuT8twrItRNDjJbO6M=
 go.abhg.dev/goldmark/frontmatter v0.3.0 h1:ZOrMkeyyYzhlbenFNmOXyGFx1dFE8TgBWAgZfs9D5RA=
 go.abhg.dev/goldmark/frontmatter v0.3.0/go.mod h1:W3KXvVveKKxU1FIFZ7fgFFQrlkcolnDcOVmu19cCO9U=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=

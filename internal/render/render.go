@@ -47,9 +47,13 @@ type Result struct {
 type Renderer struct {
 	once     sync.Once
 	markdown goldmark.Markdown
+	cache    *svgCache
+	math     *mathRenderer
 }
 
-func New() *Renderer { return &Renderer{} }
+func New() *Renderer {
+	return &Renderer{cache: newSVGCache(), math: &mathRenderer{}}
+}
 
 func (r *Renderer) init() {
 	r.once.Do(func() {
@@ -94,7 +98,7 @@ func (r *Renderer) Render(md string, profile Profile, themeID string) (*Result, 
 	if err := r.markdown.Convert([]byte(md), &buf); err != nil {
 		return nil, fmt.Errorf("render markdown: %w", err)
 	}
-	body := buf.String()
+	body := r.applyBlocks(buf.String())
 
 	switch profile {
 	case ProfileWeChat:
