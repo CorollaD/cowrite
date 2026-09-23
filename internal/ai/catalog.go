@@ -117,6 +117,18 @@ var Catalog = []Provider{
 		Voice: true,
 	},
 	{
+		ID:      "ark",
+		Name:    "火山方舟 (豆包)",
+		BaseURL: "https://ark.cn-beijing.volces.com/api/v3",
+		Auth:    AuthAPIKey,
+		Models: []string{
+			"doubao-seed-2-0-lite-260428",
+			"doubao-pro-32k-241215",
+		},
+		Notes: "字节跳动豆包大模型，OpenAI 兼容接口。中文写作质量好。注意方舟只有对话，语音识别要用下面的「火山引擎」。",
+		Chat:  true,
+	},
+	{
 		ID:      "volcengine",
 		Name:    "火山引擎",
 		BaseURL: "", // not OpenAI-compatible; handled by its own client
