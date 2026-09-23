@@ -41,8 +41,9 @@ make build
 **环境**
 - 8 套配色：纸白、米黄、薄荷、淡绿、天青、深褐、极夜、墨蓝
 - 三种写作模式：Markdown 源码、富文本所见即所得、无干扰专注
-- 环境音：海浪、雨声、暴雨、溪流、风声、篝火、低频，实时合成不占体积
-- 想用自己的录音，放进 `~/cowrite/.cowrite/sounds/`（mp3 / ogg / wav）
+- 环境音：雨声、海浪、溪流、森林、风声，真实田野录音循环播放
+- 录音来自 radio aporee 声音地图，CC 授权，来源见 `sounds/CREDITS.md`
+- 想加自己的录音，放进 `~/cowrite/.cowrite/sounds/`（mp3 / ogg / wav）
 
 **排版**
 - 代码高亮、表格、公式、Mermaid 图表，全部纯 Go 渲染，不需要 Node

@@ -314,8 +314,9 @@
         <input id="vol" type="range" min="0" max="1" step="0.05">
       </div>
       <div class="dlg-note">
-        这些是实时合成的白噪音，不占体积也不会循环重复。<br>
-        想用自己的录音，把 mp3 / ogg / wav 放进
+        真实环境录音，来自 radio aporee 声音地图（CC 授权，详见目录里的
+        <code>CREDITS.md</code>）。<br>
+        想加自己的录音，把 mp3 / ogg / wav 放进
         <code>~/cowrite/.cowrite/sounds/</code> 就会出现在上面。
       </div>
       <div class="dlg-actions">
@@ -1229,11 +1230,12 @@ events.addEventListener('change', async e => {
 
 // ---- 环境音 -------------------------------------------------------------
 
-// Synthesised rather than shipped as audio files: recordings would add
-// megabytes to the binary and carry licensing questions, while noise-based
-// sounds synthesise convincingly and loop forever without repeating.
+// Plays the field recordings in the workspace sounds directory. Web Audio
+// rather than <audio> so a loop has no gap at the seam, and so volume is
+// shared across clips.
 const Ambience = (() => {
-  let ctx = null, master = null, stop = null, current = null;
+  let ctx = null, master = null, source = null, current = null;
+  const cache = new Map();
 
   function audio() {
     if (!ctx) {
@@ -1245,147 +1247,36 @@ const Ambience = (() => {
     return ctx;
   }
 
-  // A few seconds of noise, looped. Long enough that the loop point is
-  // inaudible, short enough to generate instantly.
-  function noiseBuffer(seconds = 4) {
-    const c = audio();
-    const buf = c.createBuffer(1, c.sampleRate * seconds, c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  async function buffer(url) {
+    if (cache.has(url)) return cache.get(url);
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('读取音频失败');
+    const buf = await audio().decodeAudioData(await res.arrayBuffer());
+    cache.set(url, buf);
     return buf;
   }
 
-  function noiseSource() {
-    const c = audio();
-    const src = c.createBufferSource();
-    src.buffer = noiseBuffer();
-    src.loop = true;
-    return src;
-  }
-
-  // Slow random drift, which is what makes noise sound like weather
-  // instead of a hiss.
-  function drift(param, base, depth, seconds) {
-    const c = audio();
-    let t = c.currentTime;
-    param.setValueAtTime(base, t);
-    for (let i = 0; i < 60; i++) {
-      t += seconds * (0.6 + Math.random() * 0.8);
-      param.linearRampToValueAtTime(base + (Math.random() * 2 - 1) * depth, t);
-    }
-  }
-
-  const builders = {
-    waves() {
-      const c = audio();
-      const src = noiseSource();
-      const lp = c.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 520;
-      const swell = c.createGain();
-      swell.gain.value = 0.35;
-      // Long swell and retreat, roughly the period of real surf.
-      drift(swell.gain, 0.35, 0.28, 5.5);
-      drift(lp.frequency, 520, 260, 6);
-      src.connect(lp); lp.connect(swell); swell.connect(master);
-      src.start();
-      return () => src.stop();
-    },
-    rain() {
-      const c = audio();
-      const src = noiseSource();
-      const hp = c.createBiquadFilter();
-      hp.type = 'highpass'; hp.frequency.value = 900;
-      const lp = c.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 6500;
-      const g = c.createGain(); g.gain.value = 0.22;
-      drift(g.gain, 0.22, 0.05, 3);
-      src.connect(hp); hp.connect(lp); lp.connect(g); g.connect(master);
-      src.start();
-      return () => src.stop();
-    },
-    storm() {
-      const c = audio();
-      const src = noiseSource();
-      const lp = c.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 2200;
-      const g = c.createGain(); g.gain.value = 0.3;
-      drift(g.gain, 0.3, 0.14, 2.2);
-      drift(lp.frequency, 2200, 900, 4);
-      src.connect(lp); lp.connect(g); g.connect(master);
-      src.start();
-      return () => src.stop();
-    },
-    stream() {
-      const c = audio();
-      const src = noiseSource();
-      const bp = c.createBiquadFilter();
-      bp.type = 'bandpass'; bp.frequency.value = 1400; bp.Q.value = 0.7;
-      const g = c.createGain(); g.gain.value = 0.26;
-      drift(bp.frequency, 1400, 420, 1.8);
-      src.connect(bp); bp.connect(g); g.connect(master);
-      src.start();
-      return () => src.stop();
-    },
-    wind() {
-      const c = audio();
-      const src = noiseSource();
-      const bp = c.createBiquadFilter();
-      bp.type = 'bandpass'; bp.frequency.value = 420; bp.Q.value = 1.4;
-      const g = c.createGain(); g.gain.value = 0.3;
-      drift(bp.frequency, 420, 260, 4.5);
-      drift(g.gain, 0.3, 0.16, 5);
-      src.connect(bp); bp.connect(g); g.connect(master);
-      src.start();
-      return () => src.stop();
-    },
-    fire() {
-      const c = audio();
-      const src = noiseSource();
-      const lp = c.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 1100;
-      const g = c.createGain(); g.gain.value = 0.2;
-      // Fast, irregular flicker: crackle rather than weather.
-      drift(g.gain, 0.2, 0.13, 0.35);
-      src.connect(lp); lp.connect(g); g.connect(master);
-      src.start();
-      return () => src.stop();
-    },
-    brown() {
-      const c = audio();
-      const src = noiseSource();
-      const lp = c.createBiquadFilter();
-      lp.type = 'lowpass'; lp.frequency.value = 320;
-      const g = c.createGain(); g.gain.value = 0.45;
-      src.connect(lp); lp.connect(g); g.connect(master);
-      src.start();
-      return () => src.stop();
-    },
-  };
-
-  async function playFile(url) {
-    const c = audio();
-    const src = c.createBufferSource();
-    const res = await fetch(url);
-    src.buffer = await c.decodeAudioData(await res.arrayBuffer());
-    src.loop = true;
-    src.connect(master);
-    src.start();
-    return () => src.stop();
-  }
-
   return {
-    list: Object.keys(builders),
     playing: () => current,
-    async play(id, fileURL) {
+    async play(id, url) {
       this.stop();
-      audio();
-      // Browsers start the context suspended until a user gesture.
-      if (ctx.state === 'suspended') await ctx.resume();
-      stop = fileURL ? await playFile(fileURL) : builders[id]();
+      const c = audio();
+      // Browsers keep the context suspended until a user gesture.
+      if (c.state === 'suspended') await c.resume();
+
+      const buf = await buffer(url);
+      source = c.createBufferSource();
+      source.buffer = buf;
+      source.loop = true;
+      // Skip the fades baked into each clip so the loop joins cleanly.
+      source.loopStart = 1.5;
+      source.loopEnd = Math.max(buf.duration - 1.5, 2);
+      source.connect(master);
+      source.start();
       current = id;
     },
     stop() {
-      if (stop) { try { stop(); } catch {} stop = null; }
+      if (source) { try { source.stop(); } catch {} source = null; }
       current = null;
     },
     volume(v) {
@@ -1519,40 +1410,42 @@ richEl.addEventListener('blur', async () => {
 const soundDlg = $('#soundDialog'), soundList = $('#soundList'), volEl = $('#vol');
 
 const SOUND_NAMES = {
-  waves: '海浪', rain: '雨声', storm: '暴雨',
-  stream: '溪流', wind: '风声', fire: '篝火', brown: '低频',
+  waves: '海浪', rain: '雨声', stream: '溪流',
+  wind: '风声', forest: '森林',
 };
 
 async function loadSounds() {
   soundList.innerHTML = '';
-  const add = (id, label, fileURL) => {
+  let files = [];
+  try { files = await api('GET', '/sounds'); } catch {}
+
+  if (!files.length) {
+    soundList.innerHTML =
+      '<div class="dlg-note">还没有音频。把 mp3 / ogg / wav 放进下面的目录即可。</div>';
+    return;
+  }
+
+  for (const f of files) {
+    const id = 'file:' + f.file;
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = label;
+    b.textContent = SOUND_NAMES[f.name] || f.name;
     if (Ambience.playing() === id) {
       b.style.borderColor = 'var(--accent)';
       b.style.color = 'var(--accent)';
     }
     b.onclick = async () => {
-      if (Ambience.playing() === id) { Ambience.stop(); }
+      if (Ambience.playing() === id) Ambience.stop();
       else {
-        try { await Ambience.play(id, fileURL); }
-        catch (err) { toast('播放失败：' + err.message); }
+        try {
+          await Ambience.play(id, '/api/sounds/' + encodeURIComponent(f.file));
+        } catch (err) { toast('播放失败：' + err.message); }
       }
       updateSoundBadge();
       loadSounds();
     };
     soundList.append(b);
-  };
-
-  for (const id of Ambience.list) add(id, SOUND_NAMES[id] || id);
-
-  // Whatever the user put in their sounds directory.
-  try {
-    for (const f of await api('GET', '/sounds')) {
-      add('file:' + f.file, f.name, '/api/sounds/' + encodeURIComponent(f.file));
-    }
-  } catch {}
+  }
 }
 
 function updateSoundBadge() {
