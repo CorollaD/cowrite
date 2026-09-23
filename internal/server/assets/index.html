@@ -195,6 +195,8 @@
 
   /* Focus mode: one column, nothing else on screen. */
   body.focus #sidebar, body.focus #preview { display: none; }
+  /* Focus mode hides the furniture, and a gutter of numbers is furniture. */
+  body.focus #editor .cm-gutters { display: none; }
   body.focus #bar { opacity: .15; transition: opacity .2s; }
   body.focus #bar:hover { opacity: 1; }
   body.focus #editor, body.focus #rich {
@@ -347,6 +349,7 @@
       <button id="toggle" title="切换预览">预览</button>
       <button id="copy" title="复制为公众号格式">复制公众号</button>
         <button id="export" title="导出 Markdown 或 HTML">导出</button>
+        <button id="newInBar" title="新建文章">新建</button>
     </div>
     <div id="empty">← 从左侧开始</div>
     <div id="panes" style="display:none">
@@ -842,12 +845,21 @@ function handleEditorInput() {
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 addEventListener('beforeunload', e => { if (dirty) { save(); e.preventDefault(); } });
 
-$('#new').onclick = async () => {
+async function newPost() {
   const p = await api('POST', '/posts', { title: '', body: '# 新文章\n\n' });
   await refreshList();
   await open(p.id);
-  editor.focus();
-};
+  // Rich text keeps its own DOM, so it has to be refilled before focusing.
+  if (mode === 'rich') {
+    await showRich();
+    richEl.focus();
+  } else {
+    editor.focus();
+  }
+}
+
+$('#new').onclick = newPost;
+$('#newInBar').onclick = newPost;
 
 $('#toggle').onclick = () => {
   document.body.classList.toggle('solo');
