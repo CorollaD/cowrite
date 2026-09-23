@@ -11,6 +11,9 @@ make build
 # 浏览器打开 http://127.0.0.1:8080
 ```
 
+不想自己编译？下载对应平台的可执行文件即可，安装步骤见
+**[INSTALL.md](INSTALL.md)**（覆盖 macOS / Windows / Linux，含开机自启和常见问题）。
+
 ## 它能做什么
 
 **写**
