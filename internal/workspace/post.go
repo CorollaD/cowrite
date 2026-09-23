@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 
 	"github.com/google/uuid"
 	"gopkg.in/yaml.v3"
@@ -116,26 +115,4 @@ func DeriveTitle(body string) string {
 		return line
 	}
 	return "Untitled"
-}
-
-// WordCount counts CJK characters individually and runs of Latin script as
-// words, which is what a mixed Chinese/English draft needs.
-func WordCount(body string) int {
-	count := 0
-	inWord := false
-	for _, r := range body {
-		switch {
-		case unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r):
-			count++
-			inWord = false
-		case unicode.IsLetter(r) || unicode.IsNumber(r):
-			if !inWord {
-				count++
-				inWord = true
-			}
-		default:
-			inWord = false
-		}
-	}
-	return count
 }

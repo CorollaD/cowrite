@@ -73,6 +73,7 @@ func (s *Server) Handler() http.Handler {
 		r.Get("/events", s.handleEvents)
 		r.Post("/render", s.handleRender)
 		r.Post("/to-markdown", s.handleToMarkdown)
+		r.Post("/stats", s.handleStats)
 		r.Route("/ai", func(r chi.Router) {
 			r.Get("/config", s.handleGetAIConfig)
 			r.Put("/config", s.handleSaveAIConfig)

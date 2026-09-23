@@ -203,6 +203,19 @@
     transition: border-color .12s, background .12s;
   }
   .dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  #words { cursor: pointer; }
+  #words:hover { color: var(--accent); }
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; background: var(--bg);
+  }
+  .stat .v { font-size: 20px; font-weight: 600; line-height: 1.2; }
+  .stat .k { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .goal-row { display: flex; align-items: center; gap: 8px; }
+  .goal-row input { width: 110px; }
+  .bar { height: 6px; border-radius: 999px; background: var(--border); overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--accent); transition: width .25s; }
   .sound-row { display: flex; align-items: center; gap: 4px; }
   .sound-row .del {
     border: 0; background: none; color: var(--muted); font-size: 14px;
@@ -384,6 +397,26 @@
     </form>
   </dialog>
 
+  <dialog id="statsDialog">
+    <div class="dlg-body">
+      <h2>字数统计</h2>
+      <div class="stat-grid" id="statGrid"></div>
+      <div class="field">
+        <label for="goalInput">写作目标（字数，留空则不设）</label>
+        <div class="goal-row">
+          <input id="goalInput" type="number" min="0" step="100" placeholder="例如 2000">
+          <div class="bar" style="flex:1"><i id="goalBar" style="width:0"></i></div>
+          <span id="goalPct" class="dlg-note" style="white-space:nowrap"></span>
+        </div>
+      </div>
+      <div class="dlg-note" id="statNote"></div>
+      <div class="dlg-actions">
+        <span style="flex:1"></span>
+        <button id="statsClose" type="button">关闭</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="exportDialog">
     <div class="dlg-body">
       <h2>导出</h2>
@@ -520,7 +553,10 @@ const api = async (method, path, body) => {
   return data;
 };
 
-const countWords = t => (t.match(/[一-鿿]|[A-Za-z0-9]+/g) || []).length;
+// Counting lives on the server so the editor, the post list and the
+// stats panel can never disagree. A local estimate keeps the toolbar
+// responsive between round trips.
+const estimateWords = t => (t.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]|[A-Za-z0-9]+/g) || []).length;
 
 async function refreshList() {
   const posts = await api('GET', '/posts');
@@ -597,7 +633,27 @@ function setStatus(text, warn = false) {
   statusEl.textContent = text;
   statusEl.className = warn ? 'warn' : '';
 }
-function updateWords() { wordsEl.textContent = countWords(editor.value) + ' 字'; }
+let statsTimer = null, lastStats = null;
+
+function updateWords() {
+  // Show the estimate at once, then reconcile with the server.
+  wordsEl.textContent = estimateWords(editor.value) + ' 字';
+  clearTimeout(statsTimer);
+  statsTimer = setTimeout(refreshStats, 500);
+}
+
+async function refreshStats() {
+  try {
+    lastStats = await api('POST', '/stats', { body: editor.value });
+  } catch {
+    return; // keep the estimate rather than blanking the count
+  }
+  const goal = Number(localStorage.getItem('cw.goal') || 0);
+  wordsEl.textContent = goal > 0
+    ? `${lastStats.words} / ${goal} 字`
+    : `${lastStats.words} 字`;
+  if (statsDlg.open) renderStats();
+}
 
 async function renderPreview() {
   if (panesEl.style.display === 'none') return;
@@ -1448,6 +1504,68 @@ searchEl.addEventListener('input', () => {
 searchEl.addEventListener('search', () => runSearch(searchEl.value));
 
 // ---- 导出 ---------------------------------------------------------------
+
+// ---- 字数统计 -----------------------------------------------------------
+
+const statsDlg = $('#statsDialog');
+
+const STAT_FIELDS = [
+  ['words',      '字数',   '中文按字、西文按词'],
+  ['characters', '字符数', '含空格'],
+  ['noSpaces',   '字符数', '不含空格'],
+  ['paragraphs', '段落'],
+  ['sentences',  '句子'],
+  ['readMinutes','阅读时长', '分钟'],
+];
+
+function renderStats() {
+  const grid = $('#statGrid');
+  grid.innerHTML = '';
+  if (!lastStats) return;
+
+  for (const [key, label, hint] of STAT_FIELDS) {
+    const el = document.createElement('div');
+    el.className = 'stat';
+    el.innerHTML = '<div class="v"></div><div class="k"></div>';
+    el.querySelector('.v').textContent = lastStats[key];
+    el.querySelector('.k').textContent = hint ? `${label} · ${hint}` : label;
+    grid.append(el);
+  }
+
+  $('#statNote').textContent =
+    `中文 ${lastStats.cjk} 字，西文 ${lastStats.latin} 词。` +
+    `阅读时长按每分钟 400 字估算。`;
+
+  renderGoal();
+}
+
+function renderGoal() {
+  const goal = Number($('#goalInput').value || 0);
+  const words = lastStats?.words || 0;
+  const pct = goal > 0 ? Math.min(100, Math.round((words / goal) * 100)) : 0;
+  $('#goalBar').style.width = pct + '%';
+  $('#goalPct').textContent = goal > 0 ? pct + '%' : '';
+}
+
+$('#goalInput').addEventListener('input', () => {
+  const goal = Number($('#goalInput').value || 0);
+  // Remembered per browser: a goal is a personal habit, not part of the
+  // document, so it does not belong in the file.
+  if (goal > 0) localStorage.setItem('cw.goal', String(goal));
+  else localStorage.removeItem('cw.goal');
+  renderGoal();
+  refreshStats();
+});
+
+wordsEl.onclick = async () => {
+  if (!current) { toast('先打开一篇文章'); return; }
+  $('#goalInput').value = localStorage.getItem('cw.goal') || '';
+  await refreshStats();
+  renderStats();
+  statsDlg.showModal();
+};
+
+$('#statsClose').onclick = () => statsDlg.close();
 
 const EXPORT_FORMATS = [
   ['md',   'Markdown', '源文件，含 front matter，可无损再导入'],
