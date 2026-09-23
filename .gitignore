@@ -1,5 +1,19 @@
 bin/
+dist/
+
+# SQLite index and its write-ahead log
 *.db
 *.db-wal
 *.db-shm
-dist/
+
+# Secrets. Keys normally live in the OS keyring, but cowrite falls back to
+# a 0600 file where no keyring exists, and that file must never be
+# committed. Listed here so an accidental copy into the repo is caught.
+secrets.json
+.env
+*.pem
+*.key
+
+# A workspace copied in for testing would carry drafts and possibly the
+# secrets fallback with it.
+.cowrite/
