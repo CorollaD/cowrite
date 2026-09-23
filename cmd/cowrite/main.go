@@ -14,6 +14,7 @@ import (
 	"github.com/corollad/cowrite/internal/config"
 	"github.com/corollad/cowrite/internal/history"
 	"github.com/corollad/cowrite/internal/index"
+	"github.com/corollad/cowrite/internal/logging"
 	"github.com/corollad/cowrite/internal/server"
 	"github.com/corollad/cowrite/internal/store"
 	"github.com/corollad/cowrite/internal/workspace"
@@ -46,7 +47,13 @@ func run() error {
 		return nil
 	}
 
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	// Logs go to the workspace as well as the terminal: a local app is
+	// often started by double-clicking, with no terminal left to read.
+	log, logWriter := logging.Setup(
+		filepath.Join(cfg.Workspace, ".cowrite", "logs"), slog.LevelInfo)
+	if logWriter != nil {
+		defer logWriter.Close()
+	}
 
 	ws, err := workspace.New(cfg.Workspace)
 	if err != nil {

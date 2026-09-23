@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -203,14 +204,41 @@ func (s *Server) handleDeletePost(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusInternalServerError, "get post", err)
 		return
 	}
-	// The file is left on disk on purpose: deleting is the user's call to
-	// make in their own file manager, and this keeps the tool from ever
-	// destroying writing.
+	// A snapshot first: deleting is the one action here that destroys
+	// writing, so the text stays recoverable from version history even
+	// after the file is gone.
+	path := filepath.Join(s.ws.Root, p.Path)
+	if entry, err := s.ws.Load(path); err == nil {
+		if _, err := s.history.Snapshot(p.ID, entry.Post.Body, store.KindManual); err != nil {
+			s.log.Warn("snapshot before delete failed", "post", p.ID, "err", err)
+		}
+	}
+
+	// ?purge=1 removes the file as well. Without it the row is hidden and
+	// the markdown is left alone, which is what someone tidying a list
+	// usually wants.
+	purge := r.URL.Query().Get("purge") == "1"
+	if purge {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			s.fail(w, http.StatusInternalServerError, "删除文件失败", err)
+			return
+		}
+		// Drop the post's own directory if nothing else is in it.
+		if dir := filepath.Dir(path); dir != s.ws.PostsDir() {
+			if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+				_ = os.Remove(dir)
+			}
+		}
+	}
+
 	if err := s.db.SoftDeletePost(p.ID); err != nil {
 		s.fail(w, http.StatusInternalServerError, "delete post", err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	if err := s.db.RemoveFromSearch(p.ID); err != nil {
+		s.log.Warn("search removal failed", "post", p.ID, "err", err)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"purged": purge})
 }
 
 func summarize(p store.Post) postSummary {

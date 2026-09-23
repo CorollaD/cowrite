@@ -84,6 +84,18 @@
   .item.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
   .item .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .m { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .item { position: relative; }
+  .item-del {
+    position: absolute; top: 8px; right: 8px;
+    border: 0; background: none; color: var(--muted);
+    font-size: 15px; line-height: 1; padding: 2px 6px;
+    border-radius: 4px; opacity: 0; transition: opacity .12s;
+  }
+  .item:hover .item-del { opacity: 1; }
+  .item-del:hover {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+  }
   #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
   #bar {
     padding: 9px 18px; border-bottom: 1px solid var(--border);
@@ -92,10 +104,34 @@
   }
   #panes { flex: 1; display: flex; min-height: 0; }
   #editor {
-    flex: 1; width: 50%; border: 0; outline: 0; resize: none;
-    padding: 28px 32px; background: var(--bg); color: var(--text);
-    font: 15px/1.75 ui-monospace, "SF Mono", Menlo, monospace;
+    flex: 1; width: 50%; min-width: 0; overflow: hidden;
+    background: var(--bg); color: var(--text);
   }
+  /* CodeMirror is themed through the app's own variables so it follows
+     whichever writing background is selected. */
+  #editor .cm-editor { height: 100%; background: var(--bg); color: var(--text); }
+  #editor .cm-editor.cm-focused { outline: none; }
+  #editor .cm-scroller {
+    font: 15px/1.75 ui-monospace, "SF Mono", Menlo, monospace;
+    padding: 22px 8px 22px 0;
+  }
+  #editor .cm-content { caret-color: var(--accent); }
+  #editor .cm-gutters {
+    background: var(--bg); color: var(--muted);
+    border-right: 1px solid var(--border); padding-right: 4px;
+  }
+  #editor .cm-lineNumbers .cm-gutterElement { padding: 0 6px 0 12px; }
+  #editor .cm-activeLine { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+  #editor .cm-activeLineGutter {
+    background: color-mix(in srgb, var(--accent) 9%, transparent);
+    color: var(--text);
+  }
+  #editor .cm-cursor { border-left-color: var(--accent); }
+  #editor .cm-selectionBackground,
+  #editor .cm-content ::selection {
+    background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+  }
+  #editor .cm-placeholder { color: var(--muted); }
   #preview {
     flex: 1; width: 50%; border: 0; border-left: 1px solid var(--border);
     background: var(--panel);
@@ -314,8 +350,7 @@
     </div>
     <div id="empty">← 从左侧开始</div>
     <div id="panes" style="display:none">
-      <textarea id="editor" spellcheck="false"
-                placeholder="# 标题&#10;&#10;开始写…"></textarea>
+      <div id="editor"></div>
       <div id="rich" contenteditable="true" spellcheck="false"
            data-placeholder="开始写…" style="display:none"></div>
       <iframe id="preview" sandbox=""></iframe>
@@ -535,13 +570,68 @@
   </main>
 
 <script type="module">
+import {
+  EditorView, basicSetup, markdown,
+  syntaxHighlighting, defaultHighlightStyle,
+} from './vendor/codemirror.js';
+
 const $ = s => document.querySelector(s);
-const listEl = $('#list'), editor = $('#editor'), statusEl = $('#status'),
+
+// CodeMirror replaces the textarea, but the rest of the app was written
+// against `value`, `selectionStart` and `selectionEnd`. Exposing those on
+// the view keeps thirty call sites unchanged and keeps the editor
+// swappable later.
+function createEditor(mount, { onInput, onBlur }) {
+  const view = new EditorView({
+    parent: mount,
+    doc: '',
+    extensions: [
+      basicSetup,
+      markdown(),
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      EditorView.lineWrapping,
+      EditorView.updateListener.of(u => {
+        if (u.docChanged) onInput?.();
+      }),
+      EditorView.domEventHandlers({ blur: () => { onBlur?.(); } }),
+    ],
+  });
+
+  return {
+    view,
+    get value() { return view.state.doc.toString(); },
+    set value(text) {
+      if (text === this.value) return;
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: text },
+      });
+    },
+    get selectionStart() { return view.state.selection.main.from; },
+    get selectionEnd() { return view.state.selection.main.to; },
+    setSelectionRange(from, to) {
+      const max = view.state.doc.length;
+      view.dispatch({
+        selection: { anchor: Math.min(from, max), head: Math.min(to, max) },
+      });
+    },
+    focus() { view.focus(); },
+    // Kept so existing display toggles still work on the container.
+    style: mount.style,
+    addEventListener() {},   // input and blur are wired above
+  };
+}
+
+const listEl = $('#list'), statusEl = $('#status'),
       wordsEl = $('#words'), emptyEl = $('#empty'), panesEl = $('#panes'),
       previewEl = $('#preview'), themeSel = $('#theme'), toastEl = $('#toast');
 
 let theme = localStorage.getItem('cw.theme') || 'default';
 let renderTimer = null;
+
+const editor = createEditor($('#editor'), {
+  onInput: () => handleEditorInput(),
+  onBlur: () => save(),
+});
 
 let current = null;   // { id, hash }
 let saveTimer = null;
@@ -575,8 +665,44 @@ async function refreshList() {
     el.querySelector('.m').textContent =
       `${p.wordCount} 字 · ${new Date(p.updatedAt * 1000).toLocaleDateString('zh-CN')}`;
     el.onclick = () => open(p.id);
+
+    const del = document.createElement('button');
+    del.className = 'item-del';
+    del.textContent = '×';
+    del.title = '删除';
+    del.onclick = e => {
+      e.stopPropagation();   // do not open the post we are removing
+      deletePost(p);
+    };
+    el.append(del);
+
     listEl.append(el);
   }
+}
+
+async function deletePost(p) {
+  const name = p.title || '无标题';
+  // Two separate outcomes, so the wording says exactly which one happens.
+  const purge = confirm(
+    `删除「${name}」\n\n` +
+    `确定 = 连同 .md 文件一起删除\n` +
+    `取消 = 只从列表移除，文件保留在 ${p.path}`
+  );
+  try {
+    await api('DELETE', `/posts/${p.id}${purge ? '?purge=1' : ''}`);
+  } catch (err) {
+    toast('删除失败：' + err.message);
+    return;
+  }
+  if (current?.id === p.id) {
+    current = null;
+    panesEl.style.display = 'none';
+    emptyEl.style.display = '';
+    setStatus('选择或新建一篇文章');
+    updateAIButtons();
+  }
+  await refreshList();
+  toast(purge ? '已删除文件' : '已从列表移除，文件仍在');
 }
 
 async function open(id) {
@@ -704,7 +830,7 @@ function toast(msg) {
   setTimeout(() => toastEl.classList.remove('show'), 1800);
 }
 
-editor.addEventListener('input', () => {
+function handleEditorInput() {
   dirty = true;
   setStatus('未保存');
   updateWords();
@@ -712,8 +838,7 @@ editor.addEventListener('input', () => {
   saveTimer = setTimeout(save, 800);   // debounce
   clearTimeout(renderTimer);
   renderTimer = setTimeout(renderPreview, 250);
-});
-editor.addEventListener('blur', save);
+}
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 addEventListener('beforeunload', e => { if (dirty) { save(); e.preventDefault(); } });
 
