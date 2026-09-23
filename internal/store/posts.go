@@ -48,21 +48,50 @@ func EncodeTags(tags []string) string {
 	return string(b)
 }
 
-const upsertPost = `
-INSERT INTO posts (id, path, title, slug, tags, content_hash, mtime, size,
-                   word_count, created_at, updated_at, deleted_at)
-VALUES (:id, :path, :title, :slug, :tags, :content_hash, :mtime, :size,
-        :word_count, :created_at, :updated_at, NULL)
-ON CONFLICT(id) DO UPDATE SET
+const upsertPostFields = `
     path = excluded.path, title = excluded.title, slug = excluded.slug,
     tags = excluded.tags, content_hash = excluded.content_hash,
     mtime = excluded.mtime, size = excluded.size,
     word_count = excluded.word_count, updated_at = excluded.updated_at,
     deleted_at = NULL`
 
+const upsertPost = `
+INSERT INTO posts (id, path, title, slug, tags, content_hash, mtime, size,
+                   word_count, created_at, updated_at, deleted_at)
+VALUES (:id, :path, :title, :slug, :tags, :content_hash, :mtime, :size,
+        :word_count, :created_at, :updated_at, NULL)
+ON CONFLICT(id) DO UPDATE SET` + upsertPostFields
+
 // UpsertPost writes an index row, clearing any soft-delete mark since the
 // post evidently exists again.
+//
+// Both id and path are unique. A post can arrive with a new id at a path
+// some older row still occupies, usually because a file was deleted and
+// another created in its place, so that row is released first rather than
+// letting the write fail and leaving the file permanently unindexed.
 func (db *DB) UpsertPost(p *Post) error {
+	if _, err := db.NamedExec(upsertPost, p); err == nil {
+		return nil
+	}
+
+	var holder string
+	err := db.Get(&holder, `SELECT id FROM posts WHERE path = ? AND id != ?`,
+		p.Path, p.ID)
+	if err != nil {
+		// The conflict was not on path after all.
+		if _, err := db.NamedExec(upsertPost, p); err != nil {
+			return fmt.Errorf("upsert post %s: %w", p.ID, err)
+		}
+		return nil
+	}
+
+	// Free the path, keeping the old row addressable by id so publish
+	// history and version snapshots still resolve.
+	if _, err := db.Exec(
+		`UPDATE posts SET path = ?, deleted_at = COALESCE(deleted_at, ?) WHERE id = ?`,
+		"（已移除）"+holder, time.Now().Unix(), holder); err != nil {
+		return fmt.Errorf("release path %s: %w", p.Path, err)
+	}
 	if _, err := db.NamedExec(upsertPost, p); err != nil {
 		return fmt.Errorf("upsert post %s: %w", p.ID, err)
 	}
