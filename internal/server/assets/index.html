@@ -21,6 +21,10 @@
     --bg: #eef4ef; --panel: #f9fcfa; --border: #d3e2d7;
     --text: #1f2e24; --muted: #6d8377; --accent: #1f7a4d;
   }
+  :root[data-skin="sage"] {
+    --bg: #e8f0e4; --panel: #f4f9f1; --border: #cddfc6;
+    --text: #23301d; --muted: #6b8162; --accent: #4a7c32;
+  }
   :root[data-skin="sky"] {
     --bg: #eef2f7; --panel: #f9fbfd; --border: #d6e0ec;
     --text: #1e2836; --muted: #6f8098; --accent: #2563a8;
@@ -1441,7 +1445,8 @@ let mode = localStorage.getItem('cw.mode') || 'markdown';
 
 const SKINS = [
   ['paper', '纸白'], ['sepia', '米黄'], ['mint', '薄荷'],
-  ['sky', '天青'], ['dark', '深褐'], ['nord', '极夜'], ['ink', '墨蓝'],
+  ['sage', '淡绿'], ['sky', '天青'],
+  ['dark', '深褐'], ['nord', '极夜'], ['ink', '墨蓝'],
 ];
 
 function applySkin(id) {
