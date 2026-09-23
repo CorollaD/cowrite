@@ -2,7 +2,9 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/corollad/cowrite/internal/ai"
 	"github.com/corollad/cowrite/internal/voice"
@@ -154,6 +156,67 @@ type transcribeResponse struct {
 //
 // The raw transcript comes back immediately so the user sees something at
 // once and always has the unedited version to fall back to.
+// handlePartial transcribes one chunk of a recording that is still in
+// progress, so text appears while the person is still talking instead of
+// only after they stop.
+//
+// It deliberately skips the cleanup pass: partials are provisional and get
+// replaced, and running a model over each chunk would cost more than it
+// saves. Cleanup happens once, over the whole transcript, at the end.
+func (s *Server) handlePartial(w http.ResponseWriter, r *http.Request) {
+	cfg, err := s.voiceSettings()
+	if err != nil {
+		s.fail(w, http.StatusInternalServerError, "read voice config", err)
+		return
+	}
+	if cfg.ProviderID == "" || (cfg.ProviderID != providerVolcengine && cfg.BaseURL == "") {
+		s.fail(w, http.StatusBadRequest, "语音尚未配置", nil)
+		return
+	}
+
+	if err := r.ParseMultipartForm(maxAudioBytes); err != nil {
+		s.fail(w, http.StatusBadRequest, "读取音频失败", err)
+		return
+	}
+	file, header, err := r.FormFile("audio")
+	if err != nil {
+		s.fail(w, http.StatusBadRequest, "缺少音频", err)
+		return
+	}
+	defer file.Close()
+
+	audio, err := io.ReadAll(io.LimitReader(file, maxAudioBytes))
+	if err != nil {
+		s.fail(w, http.StatusInternalServerError, "读取音频失败", err)
+		return
+	}
+
+	secretKey := cfg.ProviderID
+	if cfg.ProviderID == providerVolcengine {
+		secretKey = secretVolcToken
+	}
+	key, err := s.secrets.Get(secretKey)
+	if err != nil {
+		s.fail(w, http.StatusInternalServerError, "read api key", err)
+		return
+	}
+
+	var raw string
+	if cfg.ProviderID == providerVolcengine {
+		vc := &voice.Volcengine{AppID: cfg.VolcAppID, Token: key, Cluster: cfg.VolcCluster}
+		raw, err = vc.Transcribe(r.Context(), audio,
+			voice.FormatFromFilename(header.Filename), cfg.Language)
+	} else {
+		tr := &voice.Transcriber{BaseURL: cfg.BaseURL, APIKey: key, Model: cfg.Model}
+		raw, err = tr.Transcribe(r.Context(), audio, header.Filename, cfg.Language, cfg.Vocabulary)
+	}
+	if err != nil {
+		s.fail(w, http.StatusBadGateway, err.Error(), err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"text": raw})
+}
+
 func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 	cfg, err := s.voiceSettings()
 	if err != nil {
@@ -173,6 +236,14 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusBadRequest, "读取音频失败", err)
 		return
 	}
+
+	// Chunked recordings arrive already transcribed; re-sending the audio
+	// would repeat work the partials have done.
+	if pre := strings.TrimSpace(r.FormValue("transcript")); pre != "" {
+		s.finishTranscript(w, r, cfg, pre, selection)
+		return
+	}
+
 	file, header, err := r.FormFile("audio")
 	if err != nil {
 		s.fail(w, http.StatusBadRequest, "缺少音频", err)
@@ -217,13 +288,17 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusBadGateway, err.Error(), err)
 		return
 	}
+	s.finishTranscript(w, r, cfg, raw, selection)
+}
+
+// finishTranscript prepares the cleanup pass over a finished transcript,
+// whether it arrived as one recording or as streamed chunks.
+func (s *Server) finishTranscript(w http.ResponseWriter, r *http.Request,
+	cfg voiceConfig, raw, selection string) {
+
 	if raw == "" {
 		writeJSON(w, http.StatusOK, transcribeResponse{Raw: ""})
 		return
-	}
-
-	if selection == "" {
-		selection = r.FormValue("selection")
 	}
 	instruction := selection != "" && voice.LooksLikeInstruction(raw)
 

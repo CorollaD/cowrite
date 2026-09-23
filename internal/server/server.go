@@ -93,6 +93,7 @@ func (s *Server) Handler() http.Handler {
 			r.Get("/config", s.handleGetVoiceConfig)
 			r.Put("/config", s.handleSaveVoiceConfig)
 			r.Post("/transcribe", s.handleTranscribe)
+			r.Post("/partial", s.handlePartial)
 		})
 		r.Get("/themes", s.handleListThemes)
 		r.Get("/sounds", s.handleListSounds)

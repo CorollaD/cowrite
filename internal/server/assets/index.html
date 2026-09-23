@@ -1069,37 +1069,178 @@ function syncVoiceKeyHint() {
       : (saved ? '已保存，留空则不修改' : '粘贴你的 API Key');
 }
 
+// Chunks are transcribed while the recording is still running, so text
+// appears as someone speaks rather than only after they stop. Groq has no
+// streaming transcription endpoint, so the stream is built from short
+// segments instead.
+const CHUNK_MS = 4000;
+
+let partials = [];      // transcribed text per finished chunk
+let pendingChunks = 0;  // chunk requests still in flight
+let recorderStream = null;
+
 async function startRecording() {
   if (recording) return;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recorderStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     chunks = [];
-    recorder = new MediaRecorder(stream);
-    recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    partials = [];
+    pendingChunks = 0;
+
+    recorder = new MediaRecorder(recorderStream);
+    recorder.ondataavailable = e => {
+      if (!e.data.size) return;
+      chunks.push(e.data);
+      // Each slice is a standalone clip: transcribe it now.
+      transcribeChunk(e.data, partials.length);
+    };
     recorder.onstop = async () => {
       // Release the mic as soon as recording ends: a live indicator that
       // outlasts the recording is alarming and rightly so.
-      stream.getTracks().forEach(t => t.stop());
-      await sendAudio(new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }));
+      recorderStream.getTracks().forEach(t => t.stop());
+      recorderStream = null;
+      await finishRecording();
     };
-    recorder.start();
+
+    // timeslice makes MediaRecorder emit data periodically instead of
+    // once at the end.
+    recorder.start(CHUNK_MS);
     recording = true;
     micBtn.classList.add('rec');
     setStatus('录音中…');
+
+    resultTitle.textContent = '听写中…';
+    resultText.textContent = '';
+    resultText.style.opacity = '.55';
+    rawToggle.style.display = 'none';
+    rawText.classList.remove('show');
+    resultEl.classList.add('show');
   } catch (err) {
     toast('无法录音：' + err.message);
   }
 }
 
+async function transcribeChunk(blob, index) {
+  // A webm slice after the first carries no header, so it is sent with
+  // the first slice prepended to stay decodable.
+  const payload = index === 0
+    ? blob
+    : new Blob([chunks[0], blob], { type: recorder.mimeType || 'audio/webm' });
+
+  partials[index] = '';
+  pendingChunks++;
+  try {
+    const fd = new FormData();
+    fd.append('audio', payload, 'chunk.webm');
+    const res = await fetch('/api/voice/partial', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.text) {
+      partials[index] = data.text;
+      showPartials();
+    }
+  } catch {
+    // A dropped chunk is not fatal: the final pass still has the audio.
+  } finally {
+    pendingChunks--;
+  }
+}
+
+function showPartials() {
+  const text = partials.filter(Boolean).join('');
+  if (text) resultText.textContent = text;
+}
 function stopRecording() {
   if (!recording) return;
   recording = false;
   micBtn.classList.remove('rec');
   recorder.stop();
-  setStatus('转写中…');
-  resultTitle.textContent = '转写中…';
-  resultText.textContent = '';
-  resultEl.classList.add('show');
+  setStatus('整理中…');
+}
+
+// finishRecording waits for the chunks still in flight, then cleans up the
+// assembled transcript in one pass rather than per chunk.
+async function finishRecording() {
+  resultTitle.textContent = '整理中…';
+
+  for (let i = 0; i < 60 && pendingChunks > 0; i++) {
+    await new Promise(r => setTimeout(r, 200));
+  }
+
+  const transcript = partials.filter(Boolean).join('').trim();
+  if (!transcript) {
+    // Nothing came back from the chunks; fall back to sending the whole
+    // recording, which also covers a clip shorter than one slice.
+    await sendAudio(new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' }));
+    return;
+  }
+
+  setStatus('已保存');
+  rawText.textContent = transcript;
+  rawToggle.style.display = '';
+  rawToggle.textContent = '查看原始转写';
+
+  const sel = editor.value.slice(editor.selectionStart, editor.selectionEnd);
+  lastScope = sel.trim()
+    ? { start: editor.selectionStart, end: editor.selectionEnd }
+    : { start: editor.selectionEnd, end: editor.selectionEnd, append: true };
+
+  const fd = new FormData();
+  fd.append('transcript', transcript);
+  if (sel.trim()) fd.append('selection', sel);
+
+  let r;
+  try {
+    const res = await fetch('/api/voice/transcribe', { method: 'POST', body: fd });
+    r = await res.json();
+    if (!res.ok) throw new Error(r.error || res.statusText);
+  } catch (err) {
+    resultTitle.textContent = '整理失败，已保留原始转写';
+    resultText.textContent = transcript;
+    resultText.style.opacity = '';
+    return;
+  }
+
+  if (!r.jobId) {
+    resultTitle.textContent = '转写结果（未整理）';
+    resultText.textContent = r.raw || transcript;
+    resultText.style.opacity = '';
+    return;
+  }
+
+  streamCleanup(r, transcript);
+}
+
+// streamCleanup renders the cleaned text as it arrives.
+function streamCleanup(r, transcript) {
+  resultTitle.textContent = r.instruction ? '按语音指令修改中…' : '整理中…';
+  if (r.instruction) rawToggle.textContent = '查看你说的指令';
+
+  let first = true;
+  const es = new EventSource(`/api/ai/stream/${r.jobId}`);
+  activeStream = es;
+  activeJob = r.jobId;
+
+  es.addEventListener('delta', e => {
+    if (first) {
+      resultText.textContent = '';
+      resultText.style.opacity = '';
+      first = false;
+    }
+    resultText.textContent += JSON.parse(e.data);
+  });
+  es.addEventListener('done', () => {
+    resultText.style.opacity = '';
+    resultTitle.textContent = r.instruction ? '语音指令结果' : '语音整理';
+    es.close(); activeStream = null; activeJob = null;
+  });
+  es.addEventListener('error', () => {
+    // Cleanup failed, but the transcript is good: show it rather than
+    // losing what was just said.
+    resultTitle.textContent = '整理失败，已保留原始转写';
+    if (!resultText.textContent) resultText.textContent = transcript;
+    resultText.style.opacity = '';
+    es.close(); activeStream = null; activeJob = null;
+  });
 }
 
 async function sendAudio(blob) {
