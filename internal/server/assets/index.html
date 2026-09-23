@@ -165,6 +165,50 @@
     width: 100%; max-width: 46rem; margin: 0 auto;
     padding: 6vh 2rem; font-size: 17px; line-height: 1.9;
   }
+  /* Provider picker: cards rather than a dropdown, so the tradeoffs are
+     visible while choosing instead of hidden behind a select. */
+  .pcards { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .pcard {
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+    cursor: pointer; background: var(--bg); transition: border-color .12s;
+  }
+  .pcard:hover { border-color: var(--accent); }
+  .pcard.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .pcard .n { font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 5px; }
+  .pcard .d { font-size: 11px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .tag-free {
+    font-size: 10px; border: 1px solid currentColor; border-radius: 3px;
+    padding: 0 3px; color: var(--accent); font-weight: 400;
+  }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field .row { display: flex; gap: 6px; }
+  .field .row input { flex: 1; min-width: 0; }
+  .pill {
+    font-size: 12px; padding: 4px 9px; border-radius: 999px;
+    border: 1px solid var(--border); color: var(--muted); font-weight: 400;
+  }
+  .pill.ok { color: #16a34a; border-color: currentColor; }
+  .pill.bad { color: var(--accent); border-color: currentColor; }
+  dialog h2 { display: flex; align-items: center; gap: 8px; }
+  .dlg-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin: -4px 0 4px; }
+  .dlg-tabs button {
+    border: 0; border-bottom: 2px solid transparent; border-radius: 0;
+    padding: 6px 10px; font-size: 13px; color: var(--muted); background: none;
+  }
+  .dlg-tabs button.on { color: var(--text); border-bottom-color: var(--accent); }
+  .tabpane[hidden] { display: none; }
+  .dropzone {
+    border: 1px dashed var(--border); border-radius: 8px;
+    padding: 14px; text-align: center; font-size: 12px; color: var(--muted);
+    transition: border-color .12s, background .12s;
+  }
+  .dropzone.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .sound-row { display: flex; align-items: center; gap: 4px; }
+  .sound-row .del {
+    border: 0; background: none; color: var(--muted); font-size: 14px;
+    padding: 2px 5px; border-radius: 4px; line-height: 1;
+  }
+  .sound-row .del:hover { color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
   #mic.rec { background: var(--accent); color: #fff; border-color: var(--accent); }
   @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .45 } }
   #mic.rec { animation: pulse 1.2s infinite; }
@@ -278,26 +322,61 @@
     </div>
   </div>
 
-  <dialog id="aiDialog">
+  <dialog id="aiDialog" style="width:520px">
     <form method="dialog" class="dlg-body">
-      <h2>AI 设置</h2>
-      <div>
-        <label for="provider">服务商</label>
-        <select id="provider"></select>
+      <h2>AI 设置 <span id="aiState" class="pill">未配置</span></h2>
+
+      <div class="dlg-tabs">
+        <button type="button" class="on" data-tab="chat">写作模型</button>
+        <button type="button" data-tab="voice">语音转写</button>
       </div>
-      <div class="dlg-note" id="providerNote"></div>
-      <div>
-        <label for="apiKey">API Key</label>
-        <input id="apiKey" type="password" placeholder="留空则不修改已保存的 key">
+
+      <div class="tabpane" data-pane="chat">
+        <div class="field">
+          <label>服务商</label>
+          <div class="pcards" id="providerCards"></div>
+        </div>
+        <div class="field">
+          <label for="apiKey">API Key</label>
+          <input id="apiKey" type="password" placeholder="留空则不修改已保存的 key">
+        </div>
+        <div class="field">
+          <label for="model">模型</label>
+          <div class="row">
+            <input id="model" list="modelList" placeholder="例如 deepseek-chat">
+            <button id="fetchModels" type="button" title="从服务商拉取可用模型">拉取</button>
+          </div>
+          <datalist id="modelList"></datalist>
+        </div>
+        <div class="dlg-note">Key 存在系统钥匙串，不写进工作区或索引，也不回传浏览器。</div>
       </div>
-      <div>
-        <label for="model">模型</label>
-        <input id="model" list="modelList" placeholder="例如 deepseek-chat">
-        <datalist id="modelList"></datalist>
+
+      <div class="tabpane" data-pane="voice" hidden>
+        <div class="field">
+          <label>转写服务</label>
+          <div class="pcards" id="vProviderCards"></div>
+        </div>
+        <div class="field">
+          <label for="vKey">API Key</label>
+          <input id="vKey" type="password" placeholder="留空则不修改">
+        </div>
+        <div class="field">
+          <label for="vModel">转写模型</label>
+          <input id="vModel" placeholder="例如 whisper-large-v3-turbo">
+        </div>
+        <div class="field">
+          <label for="vLang">语言</label>
+          <input id="vLang" placeholder="zh / en，留空自动判断">
+        </div>
+        <div class="field">
+          <label for="vVocab">专有名词</label>
+          <textarea id="vVocab" placeholder="逗号分隔，例如：cowrite, goldmark, 张三"></textarea>
+        </div>
+        <div class="dlg-note">整理口述用的是上面「写作模型」里配的模型。音频转写完即丢，不落盘。</div>
       </div>
-      <div class="dlg-note">Key 存在系统钥匙串，不会写进工作区或索引，也不会回传浏览器。</div>
+
       <div class="dlg-actions">
-        <button id="openVoice" type="button">语音设置…</button>
+        <button id="aiTest" type="button">测试连接</button>
         <span style="flex:1"></span>
         <button value="cancel">取消</button>
         <button id="aiSave" value="save">保存</button>
@@ -305,10 +384,25 @@
     </form>
   </dialog>
 
+  <dialog id="exportDialog">
+    <div class="dlg-body">
+      <h2>导出</h2>
+      <div class="pcards" id="exportCards"></div>
+      <div class="dlg-actions">
+        <span style="flex:1"></span>
+        <button id="exportClose" type="button">关闭</button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="soundDialog">
     <div class="dlg-body">
       <h2>环境音</h2>
       <div id="soundList" style="display:flex;gap:7px;flex-wrap:wrap"></div>
+      <div id="soundDrop" class="dropzone">
+        把音频拖到这里，或 <button id="soundPick" type="button">选择文件</button>
+        <input id="soundFile" type="file" accept="audio/*" multiple hidden>
+      </div>
       <div>
         <label for="vol">音量</label>
         <input id="vol" type="range" min="0" max="1" step="0.05">
@@ -397,37 +491,6 @@
     </div>
   </dialog>
 
-  <dialog id="voiceDialog">
-    <form method="dialog" class="dlg-body">
-      <h2>语音设置</h2>
-      <div>
-        <label for="vProvider">转写服务</label>
-        <select id="vProvider"></select>
-      </div>
-      <div class="dlg-note" id="vNote"></div>
-      <div>
-        <label for="vKey">API Key</label>
-        <input id="vKey" type="password" placeholder="留空则不修改">
-      </div>
-      <div>
-        <label for="vModel">转写模型</label>
-        <input id="vModel" placeholder="例如 whisper-large-v3-turbo">
-      </div>
-      <div>
-        <label for="vLang">语言</label>
-        <input id="vLang" placeholder="zh / en，留空自动判断">
-      </div>
-      <div>
-        <label for="vVocab">专有名词</label>
-        <textarea id="vVocab" placeholder="逗号分隔，例如：cowrite, goldmark, 张三"></textarea>
-      </div>
-      <div class="dlg-note">整理用的模型取自「AI 设置」。音频转写完即丢，不落盘。</div>
-      <div class="dlg-actions">
-        <button value="cancel">取消</button>
-        <button id="vSave" value="save">保存</button>
-      </div>
-    </form>
-  </dialog>
 
   <div id="toast"></div>
   </main>
@@ -643,42 +706,84 @@ async function loadThemes() {
 
 const resultEl = $('#result'), resultText = $('#resultText'),
       resultTitle = $('#resultTitle'), dlg = $('#aiDialog'),
-      providerSel = $('#provider'), providerNote = $('#providerNote'),
-      modelInput = $('#model'), modelList = $('#modelList'), apiKeyInput = $('#apiKey');
+      modelInput = $('#model'), modelList = $('#modelList'),
+      apiKeyInput = $('#apiKey'), aiState = $('#aiState');
 
-let providers = [], commands = [], aiCfg = null;
+let providers = [], commands = [], aiCfg = null, voiceCfg = null;
+let pickedProvider = '', pickedVoiceProvider = '';
 let activeStream = null, activeJob = null, lastScope = null;
+
+for (const b of document.querySelectorAll('.dlg-tabs button')) {
+  b.onclick = () => {
+    for (const x of document.querySelectorAll('.dlg-tabs button')) x.classList.toggle('on', x === b);
+    for (const pane of document.querySelectorAll('.tabpane')) {
+      pane.hidden = pane.dataset.pane !== b.dataset.tab;
+    }
+  };
+}
+
+// Cards make the choice legible: which are free, and what each is for.
+function renderCards(box, picked, onPick) {
+  box.innerHTML = '';
+  for (const p of providers) {
+    const el = document.createElement('div');
+    el.className = 'pcard' + (p.id === picked ? ' sel' : '');
+    el.innerHTML = '<div class="n"></div><div class="d"></div>';
+    const n = el.querySelector('.n');
+    n.textContent = p.name;
+    if (p.free) {
+      const t = document.createElement('span');
+      t.className = 'tag-free';
+      t.textContent = '免费';
+      n.append(t);
+    }
+    el.querySelector('.d').textContent = p.notes || '';
+    el.onclick = () => onPick(p);
+    box.append(el);
+  }
+}
+
+function setState(text, kind) {
+  aiState.textContent = text;
+  aiState.className = 'pill' + (kind ? ' ' + kind : '');
+}
+
+function describeState() {
+  if (!aiCfg || !aiCfg.baseURL || !aiCfg.model) { setState('未配置'); return; }
+  setState(aiCfg.model, 'ok');
+}
 
 async function loadAI() {
   const r = await api('GET', '/ai/config');
   providers = r.providers; commands = r.commands; aiCfg = r.config;
+  pickedProvider = aiCfg.providerId || '';
 
-  providerSel.innerHTML = '';
-  for (const p of providers) {
-    const o = document.createElement('option');
-    o.value = p.id;
-    o.textContent = p.name + (p.free ? ' · 免费' : '');
-    providerSel.append(o);
-  }
-  if (aiCfg.providerId) providerSel.value = aiCfg.providerId;
-  showProviderNote();
+  renderCards($('#providerCards'), pickedProvider, pickProvider);
   modelInput.value = aiCfg.model || '';
+  syncKeyHint();
+  describeState();
   updateAIButtons();
+  await loadVoice();
 }
 
-function showProviderNote() {
-  const p = providers.find(x => x.id === providerSel.value);
-  providerNote.textContent = p ? p.notes : '';
+function pickProvider(p) {
+  pickedProvider = p.id;
+  renderCards($('#providerCards'), pickedProvider, pickProvider);
+  modelInput.value = p.models?.[0] || '';
   modelList.innerHTML = '';
-  for (const m of (p?.models || [])) {
+  for (const m of (p.models || [])) {
     const o = document.createElement('option');
     o.value = m;
     modelList.append(o);
   }
-  if (p && !modelInput.value) modelInput.value = p.models?.[0] || '';
+  syncKeyHint();
+}
+
+function syncKeyHint() {
+  const p = providers.find(x => x.id === pickedProvider);
   apiKeyInput.placeholder = p?.auth === 'none'
     ? '本地服务，不需要 key'
-    : (aiCfg?.hasKey ? '已保存，留空则不修改' : '粘贴你的 API Key');
+    : (aiCfg?.hasKey && p?.id === aiCfg.providerId ? '已保存，留空则不修改' : '粘贴你的 API Key');
 }
 
 function updateAIButtons() {
@@ -688,22 +793,66 @@ function updateAIButtons() {
   }
 }
 
-providerSel.onchange = () => { modelInput.value = ''; showProviderNote(); };
-
 $('#aiSettings').onclick = async () => {
   await loadAI();
   dlg.showModal();
 };
 
+$('#fetchModels').onclick = async () => {
+  setState('拉取中…');
+  try {
+    const models = await api('GET', '/ai/models');
+    modelList.innerHTML = '';
+    for (const m of models) {
+      const o = document.createElement('option');
+      o.value = m;
+      modelList.append(o);
+    }
+    setState(`${models.length} 个可用模型`, 'ok');
+  } catch (err) {
+    setState('拉取失败', 'bad');
+    toast(err.message);
+  }
+};
+
+$('#aiTest').onclick = async () => {
+  setState('测试中…');
+  try {
+    // A tiny real completion is the only honest check that key, base URL
+    // and model all work together.
+    const { jobId } = await api('POST', '/ai/run', { command: 'polish', text: '测试。' });
+    await new Promise((resolve, reject) => {
+      const es = new EventSource(`/api/ai/stream/${jobId}`);
+      let got = false;
+      es.addEventListener('delta', () => { got = true; es.close(); resolve(); });
+      es.addEventListener('done', () => { es.close(); got ? resolve() : reject(new Error('无响应')); });
+      es.addEventListener('error', e => { es.close(); reject(new Error(e.data || '连接失败')); });
+      setTimeout(() => { es.close(); got ? resolve() : reject(new Error('超时')); }, 25000);
+    });
+    setState('连接正常', 'ok');
+  } catch (err) {
+    setState('连接失败', 'bad');
+    toast(err.message);
+  }
+};
+
 $('#aiSave').onclick = async () => {
-  // The dialog closes itself; save before it does.
   try {
     aiCfg = await api('PUT', '/ai/config', {
-      providerId: providerSel.value,
+      providerId: pickedProvider,
       model: modelInput.value.trim(),
       apiKey: apiKeyInput.value,
     });
     apiKeyInput.value = '';
+    voiceCfg = await api('PUT', '/voice/config', {
+      providerId: pickedVoiceProvider,
+      model: $('#vModel').value.trim(),
+      language: $('#vLang').value.trim(),
+      vocabulary: $('#vVocab').value.trim(),
+      apiKey: $('#vKey').value,
+    });
+    $('#vKey').value = '';
+    describeState();
     updateAIButtons();
     toast('已保存');
   } catch (err) {
@@ -774,8 +923,8 @@ function stopStream() {
 $('#resultStop').onclick = () => { stopStream(); resultTitle.textContent = '已停止'; };
 $('#resultDismiss').onclick = () => { stopStream(); resultEl.classList.remove('show'); };
 
-// Insert replaces the range the command read, so the user sees the result
-// applied exactly where it came from rather than dumped at the cursor.
+// Insert replaces the range the command read, so the result lands exactly
+// where it came from rather than at the cursor.
 $('#resultInsert').onclick = async () => {
   stopStream();
   const out = resultText.textContent;
@@ -793,6 +942,7 @@ $('#resultInsert').onclick = async () => {
     resultEl.classList.remove('show');
     return;
   }
+
   const v = editor.value;
   editor.value = lastScope.append
     ? v.slice(0, lastScope.start) + out + v.slice(lastScope.start)
@@ -806,55 +956,34 @@ $('#resultInsert').onclick = async () => {
 
 // ---- 语音输入 -----------------------------------------------------------
 
-const micBtn = $('#mic'), vDlg = $('#voiceDialog'), vProvider = $('#vProvider'),
-      vNote = $('#vNote'), vKey = $('#vKey'), vModel = $('#vModel'),
-      vLang = $('#vLang'), vVocab = $('#vVocab'),
+const micBtn = $('#mic'),
       rawToggle = $('#rawToggle'), rawText = $('#rawText');
 
-let recorder = null, chunks = [], recording = false, voiceCfg = null;
+let recorder = null, chunks = [], recording = false;
 
 async function loadVoice() {
   const r = await api('GET', '/voice/config');
   voiceCfg = r.config;
-  vProvider.innerHTML = '';
-  for (const p of r.providers) {
-    const o = document.createElement('option');
-    o.value = p.id;
-    o.textContent = p.name + (p.free ? ' · 免费' : '');
-    vProvider.append(o);
-  }
-  if (voiceCfg.providerId) vProvider.value = voiceCfg.providerId;
-  vModel.value = voiceCfg.model || '';
-  vLang.value = voiceCfg.language || '';
-  vVocab.value = voiceCfg.vocabulary || '';
-  showVoiceNote(r.providers);
+  pickedVoiceProvider = voiceCfg.providerId || '';
+  renderCards($('#vProviderCards'), pickedVoiceProvider, pickVoiceProvider);
+  $('#vModel').value = voiceCfg.model || '';
+  $('#vLang').value = voiceCfg.language || '';
+  $('#vVocab').value = voiceCfg.vocabulary || '';
+  syncVoiceKeyHint();
 }
 
-function showVoiceNote(list) {
-  const p = (list || []).find(x => x.id === vProvider.value);
-  vNote.textContent = p ? p.notes : '';
-  vKey.placeholder = p?.auth === 'none'
+function pickVoiceProvider(p) {
+  pickedVoiceProvider = p.id;
+  renderCards($('#vProviderCards'), pickedVoiceProvider, pickVoiceProvider);
+  syncVoiceKeyHint();
+}
+
+function syncVoiceKeyHint() {
+  const p = providers.find(x => x.id === pickedVoiceProvider);
+  $('#vKey').placeholder = p?.auth === 'none'
     ? '本地服务，不需要 key'
-    : (voiceCfg?.hasKey ? '已保存，留空则不修改' : '粘贴你的 API Key');
+    : (voiceCfg?.hasKey && p?.id === voiceCfg.providerId ? '已保存，留空则不修改' : '粘贴你的 API Key');
 }
-
-vProvider.onchange = () => loadVoice().then(() => {});
-
-$('#vSave').onclick = async () => {
-  try {
-    voiceCfg = await api('PUT', '/voice/config', {
-      providerId: vProvider.value,
-      model: vModel.value.trim(),
-      language: vLang.value.trim(),
-      vocabulary: vVocab.value.trim(),
-      apiKey: vKey.value,
-    });
-    vKey.value = '';
-    toast('已保存');
-  } catch (err) {
-    toast('保存失败：' + err.message);
-  }
-};
 
 async function startRecording() {
   if (recording) return;
@@ -981,12 +1110,12 @@ addEventListener('keyup', e => {
   if (e.code === 'F2') { e.preventDefault(); stopRecording(); }
 });
 
-micBtn.oncontextmenu = e => { e.preventDefault(); loadVoice().then(() => vDlg.showModal()); };
-
-$('#openVoice').onclick = async () => {
-  dlg.close();
-  await loadVoice();
-  vDlg.showModal();
+// Right-click the mic to jump straight to transcription settings.
+micBtn.oncontextmenu = async e => {
+  e.preventDefault();
+  await loadAI();
+  document.querySelector('.dlg-tabs button[data-tab="voice"]').click();
+  dlg.showModal();
 };
 
 // ---- 版本历史 -----------------------------------------------------------
@@ -1320,14 +1449,45 @@ searchEl.addEventListener('search', () => runSearch(searchEl.value));
 
 // ---- 导出 ---------------------------------------------------------------
 
+const EXPORT_FORMATS = [
+  ['md',   'Markdown', '源文件，含 front matter，可无损再导入'],
+  ['html', 'HTML',     '独立网页，样式和公式都内嵌，双击即可打开'],
+  ['docx', 'Word',     '.docx 文档，标题、列表、引用都保留样式'],
+  ['pdf',  'PDF',      '在浏览器打印对话框里选「存储为 PDF」'],
+];
+
+const exportDlg = $('#exportDialog');
+
+function renderExportCards() {
+  const box = $('#exportCards');
+  box.innerHTML = '';
+  for (const [fmt, name, desc] of EXPORT_FORMATS) {
+    const el = document.createElement('div');
+    el.className = 'pcard';
+    el.innerHTML = '<div class="n"></div><div class="d"></div>';
+    el.querySelector('.n').textContent = name;
+    el.querySelector('.d').textContent = desc;
+    el.onclick = () => {
+      const url = `/api/posts/${current.id}/export` +
+        `?format=${fmt}&theme=${encodeURIComponent(theme)}`;
+      // PDF renders through the browser's print engine, so it opens;
+      // the rest are downloads.
+      if (fmt === 'pdf') window.open(url, '_blank');
+      else window.location.href = url;
+      exportDlg.close();
+    };
+    box.append(el);
+  }
+}
+
 $('#export').onclick = async () => {
   if (!current) { toast('先打开一篇文章'); return; }
   if (dirty) await save();
-  const fmt = confirm('确定 = 导出 HTML（带样式，可直接打开）\n取消 = 导出 Markdown 源文件')
-    ? 'html' : 'md';
-  window.location.href =
-    `/api/posts/${current.id}/export?format=${fmt}&theme=${encodeURIComponent(theme)}`;
+  renderExportCards();
+  exportDlg.showModal();
 };
+
+$('#exportClose').onclick = () => exportDlg.close();
 
 // ---- 写作模式与配色 ------------------------------------------------------
 
@@ -1420,13 +1580,15 @@ async function loadSounds() {
   try { files = await api('GET', '/sounds'); } catch {}
 
   if (!files.length) {
-    soundList.innerHTML =
-      '<div class="dlg-note">还没有音频。把 mp3 / ogg / wav 放进下面的目录即可。</div>';
+    soundList.innerHTML = '<div class="dlg-note">还没有音频，用下面的方式添加。</div>';
     return;
   }
 
   for (const f of files) {
     const id = 'file:' + f.file;
+    const row = document.createElement('div');
+    row.className = 'sound-row';
+
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = SOUND_NAMES[f.name] || f.name;
@@ -1444,8 +1606,46 @@ async function loadSounds() {
       updateSoundBadge();
       loadSounds();
     };
-    soundList.append(b);
+
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'del';
+    del.textContent = '×';
+    del.title = '移除';
+    del.onclick = async () => {
+      if (!confirm(`移除「${SOUND_NAMES[f.name] || f.name}」？文件会从音频目录删除。`)) return;
+      if (Ambience.playing() === id) Ambience.stop();
+      try {
+        await api('DELETE', '/sounds/' + encodeURIComponent(f.file));
+        updateSoundBadge();
+        loadSounds();
+      } catch (err) { toast('删除失败：' + err.message); }
+    };
+
+    row.append(b, del);
+    soundList.append(row);
   }
+}
+
+// Import: the file picker and drag-and-drop feed the same path.
+async function uploadSounds(fileList) {
+  const files = [...fileList];
+  if (!files.length) return;
+  let ok = 0;
+  for (const file of files) {
+    const fd = new FormData();
+    fd.append('audio', file, file.name);
+    try {
+      const res = await fetch('/api/sounds', { method: 'POST', body: fd });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || res.statusText);
+      ok++;
+    } catch (err) {
+      toast(`${file.name}：${err.message}`);
+    }
+  }
+  if (ok) toast(`已导入 ${ok} 个音频`);
+  await loadSounds();
 }
 
 function updateSoundBadge() {
@@ -1457,12 +1657,28 @@ $('#sound').onclick = async () => { await loadSounds(); soundDlg.showModal(); };
 $('#soundClose').onclick = () => soundDlg.close();
 $('#soundStop').onclick = () => { Ambience.stop(); updateSoundBadge(); loadSounds(); };
 
+$('#soundPick').onclick = () => $('#soundFile').click();
+$('#soundFile').onchange = e => {
+  uploadSounds(e.target.files);
+  e.target.value = '';
+};
+
+const dropZone = $('#soundDrop');
+for (const ev of ['dragenter', 'dragover']) {
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.add('over'); });
+}
+for (const ev of ['dragleave', 'drop']) {
+  dropZone.addEventListener(ev, e => { e.preventDefault(); dropZone.classList.remove('over'); });
+}
+dropZone.addEventListener('drop', e => {
+  if (e.dataTransfer?.files?.length) uploadSounds(e.dataTransfer.files);
+});
+
 volEl.value = String(Ambience.getVolume());
 volEl.oninput = () => Ambience.volume(Number(volEl.value));
 
 loadThemes();
 loadAI();
-loadVoice();
 applyMode(mode);
 refreshList();
 </script>

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/corollad/cowrite/internal/export"
 	"github.com/corollad/cowrite/internal/render"
 	"github.com/go-chi/chi/v5"
 )
@@ -29,6 +30,35 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	name := sanitizeFilename(p.Title)
 
 	switch format {
+	case "docx":
+		res, err := s.renderer.Render(entry.Post.Body, render.ProfileGeneric, theme)
+		if err != nil {
+			s.fail(w, http.StatusInternalServerError, "render post", err)
+			return
+		}
+		data, err := export.DOCX(res.HTML, p.Title)
+		if err != nil {
+			s.fail(w, http.StatusInternalServerError, "build docx", err)
+			return
+		}
+		setDownloadHeaders(w, name+".docx",
+			"application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+		_, _ = w.Write(data)
+
+	case "pdf":
+		// Rendered as a print-ready page rather than a PDF built in Go:
+		// every Go PDF library needs an embedded CJK font, and the system
+		// ones are .ttc collections that are not redistributable. The
+		// browser already has the fonts and a print engine.
+		res, err := s.renderer.Render(entry.Post.Body, render.ProfilePreview, theme)
+		if err != nil {
+			s.fail(w, http.StatusInternalServerError, "render post", err)
+			return
+		}
+		doc := fmt.Sprintf(printableHTML, htmlEscape(p.Title), res.CSS, res.HTML)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(doc))
+
 	case "html":
 		res, err := s.renderer.Render(entry.Post.Body, render.ProfilePreview, theme)
 		if err != nil {
@@ -57,6 +87,36 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(data)
 	}
 }
+
+// printableHTML opens the print dialog once the page has rendered, so
+// "export PDF" is one click even though the browser does the work.
+const printableHTML = `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>%s</title>
+<style>
+@page { margin: 18mm 16mm; }
+body { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+@media print { body { max-width: none; padding: 0; } .hint { display: none; } }
+.hint {
+  position: fixed; top: 0; left: 0; right: 0; padding: 9px 14px;
+  background: #1f2937; color: #fff; font: 13px/1.5 -apple-system, "PingFang SC", sans-serif;
+  text-align: center;
+}
+.hint + * { margin-top: 44px; }
+%s
+</style>
+</head>
+<body>
+<div class="hint">在打印对话框里选择「存储为 PDF」即可导出。未自动弹出时按 ⌘P / Ctrl+P。</div>
+%s
+<script>
+  addEventListener('load', () => setTimeout(() => window.print(), 400));
+</script>
+</body>
+</html>
+`
 
 func setDownloadHeaders(w http.ResponseWriter, filename, contentType string) {
 	w.Header().Set("Content-Type", contentType)

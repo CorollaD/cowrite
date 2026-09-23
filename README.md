@@ -36,14 +36,14 @@ make build
 - 微信公众号：官方 API，进草稿箱，封面和正文图片自动上传
 - 知乎 / 掘金 / CSDN / 思否 / 公众号：通过配套浏览器扩展填进平台编辑器
 - 一键复制为公众号格式（内联样式，粘进去排版不散）
-- 导出 Markdown 或独立 HTML
+- 导出 Markdown、独立 HTML、Word (.docx)、PDF（走浏览器打印）
 
 **环境**
 - 8 套配色：纸白、米黄、薄荷、淡绿、天青、深褐、极夜、墨蓝
 - 三种写作模式：Markdown 源码、富文本所见即所得、无干扰专注
 - 环境音：雨声、海浪、溪流、森林、风声，真实田野录音循环播放
 - 录音来自 radio aporee 声音地图，CC 授权，来源见 `sounds/CREDITS.md`
-- 想加自己的录音，放进 `~/cowrite/.cowrite/sounds/`（mp3 / ogg / wav）
+- 想加自己的录音，界面上直接拖进去或选文件，也可放进 `~/cowrite/.cowrite/sounds/`
 
 **排版**
 - 代码高亮、表格、公式、Mermaid 图表，全部纯 Go 渲染，不需要 Node

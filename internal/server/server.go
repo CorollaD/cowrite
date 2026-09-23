@@ -95,7 +95,9 @@ func (s *Server) Handler() http.Handler {
 		})
 		r.Get("/themes", s.handleListThemes)
 		r.Get("/sounds", s.handleListSounds)
+		r.Post("/sounds", s.handleUploadSound)
 		r.Get("/sounds/{name}", s.handleGetSound)
+		r.Delete("/sounds/{name}", s.handleDeleteSound)
 		r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 		})
