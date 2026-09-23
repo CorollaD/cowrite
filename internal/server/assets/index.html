@@ -1097,6 +1097,9 @@ function stopRecording() {
   micBtn.classList.remove('rec');
   recorder.stop();
   setStatus('转写中…');
+  resultTitle.textContent = '转写中…';
+  resultText.textContent = '';
+  resultEl.classList.add('show');
 }
 
 async function sendAudio(blob) {
@@ -1156,12 +1159,29 @@ async function sendAudio(blob) {
     // The spoken words were the command, so showing them as "raw
     // transcript" would be confusing.
     rawToggle.textContent = '查看你说的指令';
+  } else {
+    // The transcript already exists, so show it straight away and let the
+    // cleaned version replace it as it streams. Staring at an empty panel
+    // is what makes dictation feel slow, not the seconds themselves.
+    resultText.textContent = r.raw;
+    resultText.style.opacity = '.55';
   }
+
+  let firstDelta = true;
   const es = new EventSource(`/api/ai/stream/${r.jobId}`);
   activeStream = es;
   activeJob = r.jobId;
-  es.addEventListener('delta', e => { resultText.textContent += JSON.parse(e.data); });
+  es.addEventListener('delta', e => {
+    if (firstDelta) {
+      // Clear the placeholder transcript once the real answer starts.
+      resultText.textContent = '';
+      resultText.style.opacity = '';
+      firstDelta = false;
+    }
+    resultText.textContent += JSON.parse(e.data);
+  });
   es.addEventListener('done', () => {
+    resultText.style.opacity = '';
     resultTitle.textContent = r.instruction ? '语音指令结果' : '语音整理';
     es.close(); activeStream = null; activeJob = null;
   });

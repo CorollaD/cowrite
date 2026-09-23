@@ -122,8 +122,10 @@ var Catalog = []Provider{
 		BaseURL: "https://ark.cn-beijing.volces.com/api/v3",
 		Auth:    AuthAPIKey,
 		Models: []string{
+			// 260215 answers in a couple of seconds; 260428 spends far
+			// longer reasoning, which is wasted on rewriting tasks.
+			"doubao-seed-2-0-lite-260215",
 			"doubao-seed-2-0-lite-260428",
-			"doubao-pro-32k-241215",
 		},
 		Notes: "字节跳动豆包大模型，OpenAI 兼容接口。中文写作质量好。注意方舟只有对话，语音识别要用下面的「火山引擎」。",
 		Chat:  true,

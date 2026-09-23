@@ -234,6 +234,9 @@ func (s *Server) handleAIRun(w http.ResponseWriter, r *http.Request) {
 			Prompt:      prompt,
 			Model:       cfg.Model,
 			Temperature: cmd.Temperature,
+			// Polishing and continuing are rewriting, not problem
+			// solving; a thinking pass only adds latency.
+			NoThinking: true,
 		},
 	})
 	writeJSON(w, http.StatusAccepted, map[string]string{"jobId": id})

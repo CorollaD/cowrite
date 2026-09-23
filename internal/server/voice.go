@@ -246,11 +246,14 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		Prompt:      voice.BuildCleanupPrompt(raw, cfg.Vocabulary),
 		Model:       aiCfg.Model,
 		Temperature: 0.1, // cleanup must be boring and repeatable
+		// Dictation is only useful if it keeps up with speaking.
+		NoThinking: true,
 	}
 	if instruction {
 		req.System = voice.CommandSystem
 		req.Prompt = voice.BuildCommandPrompt(raw, selection)
 		req.Temperature = 0.3
+		req.NoThinking = true
 	}
 
 	jobID := s.newJobID()

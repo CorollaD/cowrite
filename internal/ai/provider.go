@@ -23,6 +23,10 @@ type Request struct {
 	Prompt      string
 	Model       string
 	Temperature float64
+	// NoThinking asks a reasoning model to answer directly. Rewriting
+	// tasks need no deliberation, and on Doubao Seed the thinking pass
+	// costs 15-25 seconds for a sentence that takes two to produce.
+	NoThinking bool
 }
 
 // Client talks to one OpenAI-compatible endpoint.
@@ -82,11 +86,19 @@ func (c *Client) Stream(ctx context.Context, req Request) (<-chan Delta, error) 
 		params.Temperature = openai.Float(req.Temperature)
 	}
 
+	// Not part of the OpenAI schema, so it goes in as a raw field.
+	// Providers that do not understand it ignore it.
+	var opts []option.RequestOption
+	if req.NoThinking {
+		opts = append(opts,
+			option.WithJSONSet("thinking", map[string]string{"type": "disabled"}))
+	}
+
 	out := make(chan Delta)
 	go func() {
 		defer close(out)
 
-		stream := c.api.Chat.Completions.NewStreaming(ctx, params)
+		stream := c.api.Chat.Completions.NewStreaming(ctx, params, opts...)
 		defer stream.Close()
 
 		for stream.Next() {
