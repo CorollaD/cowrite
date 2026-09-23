@@ -14,19 +14,30 @@ const (
 	settingVoiceModel    = "voice.model"
 	settingVoiceLanguage = "voice.language"
 	settingVocabulary    = "voice.vocabulary"
+	// Volcengine authenticates with an appid/token/cluster triple rather
+	// than a single key, so it needs its own settings.
+	settingVolcAppID   = "voice.volc_appid"
+	settingVolcCluster = "voice.volc_cluster"
+	secretVolcToken    = "volcengine"
 )
+
+// providerVolcengine is handled by a dedicated client: its ASR API is not
+// OpenAI-compatible.
+const providerVolcengine = "volcengine"
 
 // maxAudioBytes caps an upload. A few minutes of opus is well under this;
 // the limit exists so a stray request cannot exhaust memory.
 const maxAudioBytes = 25 << 20
 
 type voiceConfig struct {
-	ProviderID string `json:"providerId"`
-	BaseURL    string `json:"baseURL"`
-	Model      string `json:"model"`
-	Language   string `json:"language"`
-	Vocabulary string `json:"vocabulary"`
-	HasKey     bool   `json:"hasKey"`
+	ProviderID  string `json:"providerId"`
+	BaseURL     string `json:"baseURL"`
+	Model       string `json:"model"`
+	Language    string `json:"language"`
+	Vocabulary  string `json:"vocabulary"`
+	HasKey      bool   `json:"hasKey"`
+	VolcAppID   string `json:"volcAppId"`
+	VolcCluster string `json:"volcCluster"`
 }
 
 func (s *Server) voiceSettings() (voiceConfig, error) {
@@ -40,6 +51,8 @@ func (s *Server) voiceSettings() (voiceConfig, error) {
 		{settingVoiceModel, &c.Model},
 		{settingVoiceLanguage, &c.Language},
 		{settingVocabulary, &c.Vocabulary},
+		{settingVolcAppID, &c.VolcAppID},
+		{settingVolcCluster, &c.VolcCluster},
 	} {
 		v, err := s.db.GetSetting(f.key)
 		if err != nil {
@@ -48,7 +61,11 @@ func (s *Server) voiceSettings() (voiceConfig, error) {
 		*f.dst = v
 	}
 	if c.ProviderID != "" {
-		key, err := s.secrets.Get(c.ProviderID)
+		secretKey := c.ProviderID
+		if c.ProviderID == providerVolcengine {
+			secretKey = secretVolcToken
+		}
+		key, err := s.secrets.Get(secretKey)
 		if err != nil {
 			return c, err
 		}
@@ -70,12 +87,14 @@ func (s *Server) handleGetVoiceConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 type saveVoiceConfigRequest struct {
-	ProviderID string `json:"providerId"`
-	BaseURL    string `json:"baseURL"`
-	Model      string `json:"model"`
-	Language   string `json:"language"`
-	Vocabulary string `json:"vocabulary"`
-	APIKey     string `json:"apiKey"`
+	ProviderID  string `json:"providerId"`
+	BaseURL     string `json:"baseURL"`
+	Model       string `json:"model"`
+	Language    string `json:"language"`
+	Vocabulary  string `json:"vocabulary"`
+	APIKey      string `json:"apiKey"`
+	VolcAppID   string `json:"volcAppId"`
+	VolcCluster string `json:"volcCluster"`
 }
 
 func (s *Server) handleSaveVoiceConfig(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +114,8 @@ func (s *Server) handleSaveVoiceConfig(w http.ResponseWriter, r *http.Request) {
 		settingVoiceModel:    req.Model,
 		settingVoiceLanguage: req.Language,
 		settingVocabulary:    req.Vocabulary,
+		settingVolcAppID:     req.VolcAppID,
+		settingVolcCluster:   req.VolcCluster,
 	} {
 		if err := s.db.SetSetting(k, v); err != nil {
 			s.fail(w, http.StatusInternalServerError, "save voice config", err)
@@ -102,7 +123,11 @@ func (s *Server) handleSaveVoiceConfig(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if req.APIKey != "" && req.ProviderID != "" {
-		if err := s.secrets.Set(req.ProviderID, req.APIKey); err != nil {
+		secretKey := req.ProviderID
+		if req.ProviderID == providerVolcengine {
+			secretKey = secretVolcToken
+		}
+		if err := s.secrets.Set(secretKey, req.APIKey); err != nil {
 			s.fail(w, http.StatusInternalServerError, "save api key", err)
 			return
 		}
@@ -135,7 +160,7 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, http.StatusInternalServerError, "read voice config", err)
 		return
 	}
-	if cfg.BaseURL == "" {
+	if cfg.ProviderID == "" || (cfg.ProviderID != providerVolcengine && cfg.BaseURL == "") {
 		s.fail(w, http.StatusBadRequest, "语音尚未配置，请先在设置里选择转写服务", nil)
 		return
 	}
@@ -165,14 +190,29 @@ func (s *Server) handleTranscribe(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	key, err := s.secrets.Get(cfg.ProviderID)
+	secretKey := cfg.ProviderID
+	if cfg.ProviderID == providerVolcengine {
+		secretKey = secretVolcToken
+	}
+	key, err := s.secrets.Get(secretKey)
 	if err != nil {
 		s.fail(w, http.StatusInternalServerError, "read api key", err)
 		return
 	}
 
-	tr := &voice.Transcriber{BaseURL: cfg.BaseURL, APIKey: key, Model: cfg.Model}
-	raw, err := tr.Transcribe(r.Context(), audio, header.Filename, cfg.Language, cfg.Vocabulary)
+	var raw string
+	if cfg.ProviderID == providerVolcengine {
+		vc := &voice.Volcengine{
+			AppID:   cfg.VolcAppID,
+			Token:   key,
+			Cluster: cfg.VolcCluster,
+		}
+		raw, err = vc.Transcribe(r.Context(), audio,
+			voice.FormatFromFilename(header.Filename), cfg.Language)
+	} else {
+		tr := &voice.Transcriber{BaseURL: cfg.BaseURL, APIKey: key, Model: cfg.Model}
+		raw, err = tr.Transcribe(r.Context(), audio, header.Filename, cfg.Language, cfg.Vocabulary)
+	}
 	if err != nil {
 		s.fail(w, http.StatusBadGateway, err.Error(), err)
 		return

@@ -196,3 +196,46 @@ func TestDocumentScopeCommandsAreNotReplacements(t *testing.T) {
 		}
 	}
 }
+
+// Offering a chat-only service for transcription produces a 404 the user
+// cannot diagnose, so capabilities are declared rather than assumed.
+func TestProviderCapabilitiesAreDeclared(t *testing.T) {
+	byID := map[string]Provider{}
+	for _, p := range Catalog {
+		byID[p.ID] = p
+	}
+
+	// DeepSeek has no speech API; it must never appear as a voice option.
+	if byID["deepseek"].Voice {
+		t.Error("deepseek is chat-only but is marked as a voice provider")
+	}
+	if !byID["deepseek"].Chat {
+		t.Error("deepseek should be a chat provider")
+	}
+
+	// Volcengine is speech-only and not OpenAI-compatible.
+	volc := byID["volcengine"]
+	if !volc.Voice || volc.Chat {
+		t.Errorf("volcengine should be voice-only, got chat=%v voice=%v", volc.Chat, volc.Voice)
+	}
+	if volc.Custom == "" {
+		t.Error("volcengine needs a Custom marker; its API is not OpenAI-compatible")
+	}
+
+	// Every provider must do something.
+	for _, p := range Catalog {
+		if !p.Chat && !p.Voice {
+			t.Errorf("provider %q declares no capability", p.ID)
+		}
+	}
+	// At least one transcription option must exist.
+	var voices int
+	for _, p := range Catalog {
+		if p.Voice {
+			voices++
+		}
+	}
+	if voices == 0 {
+		t.Error("no provider can transcribe; voice input would be unusable")
+	}
+}

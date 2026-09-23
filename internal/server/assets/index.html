@@ -373,9 +373,15 @@
           <label for="vKey">API Key</label>
           <input id="vKey" type="password" placeholder="留空则不修改">
         </div>
-        <div class="field">
+        <div class="field" id="vModelField">
           <label for="vModel">转写模型</label>
           <input id="vModel" placeholder="例如 whisper-large-v3-turbo">
+        </div>
+        <div class="field" id="vVolcFields" hidden>
+          <label for="vVolcAppId">AppID</label>
+          <input id="vVolcAppId" placeholder="火山引擎控制台的应用 AppID">
+          <label for="vVolcCluster" style="margin-top:6px">Cluster（留空用默认）</label>
+          <input id="vVolcCluster" placeholder="volcengine_input_common">
         </div>
         <div class="field">
           <label for="vLang">语言</label>
@@ -779,9 +785,10 @@ for (const b of document.querySelectorAll('.dlg-tabs button')) {
 }
 
 // Cards make the choice legible: which are free, and what each is for.
-function renderCards(box, picked, onPick) {
+function renderCards(box, picked, onPick, filter) {
   box.innerHTML = '';
   for (const p of providers) {
+    if (filter && !filter(p)) continue;
     const el = document.createElement('div');
     el.className = 'pcard' + (p.id === picked ? ' sel' : '');
     el.innerHTML = '<div class="n"></div><div class="d"></div>';
@@ -799,6 +806,9 @@ function renderCards(box, picked, onPick) {
   }
 }
 
+const canChat  = p => p.chat;
+const canVoice = p => p.voice;
+
 function setState(text, kind) {
   aiState.textContent = text;
   aiState.className = 'pill' + (kind ? ' ' + kind : '');
@@ -814,7 +824,7 @@ async function loadAI() {
   providers = r.providers; commands = r.commands; aiCfg = r.config;
   pickedProvider = aiCfg.providerId || '';
 
-  renderCards($('#providerCards'), pickedProvider, pickProvider);
+  renderCards($('#providerCards'), pickedProvider, pickProvider, canChat);
   modelInput.value = aiCfg.model || '';
   syncKeyHint();
   describeState();
@@ -824,7 +834,7 @@ async function loadAI() {
 
 function pickProvider(p) {
   pickedProvider = p.id;
-  renderCards($('#providerCards'), pickedProvider, pickProvider);
+  renderCards($('#providerCards'), pickedProvider, pickProvider, canChat);
   modelInput.value = p.models?.[0] || '';
   modelList.innerHTML = '';
   for (const m of (p.models || [])) {
@@ -906,6 +916,8 @@ $('#aiSave').onclick = async () => {
       language: $('#vLang').value.trim(),
       vocabulary: $('#vVocab').value.trim(),
       apiKey: $('#vKey').value,
+      volcAppId: $('#vVolcAppId').value.trim(),
+      volcCluster: $('#vVolcCluster').value.trim(),
     });
     $('#vKey').value = '';
     describeState();
@@ -1021,24 +1033,40 @@ async function loadVoice() {
   const r = await api('GET', '/voice/config');
   voiceCfg = r.config;
   pickedVoiceProvider = voiceCfg.providerId || '';
-  renderCards($('#vProviderCards'), pickedVoiceProvider, pickVoiceProvider);
+  renderCards($('#vProviderCards'), pickedVoiceProvider, pickVoiceProvider, canVoice);
   $('#vModel').value = voiceCfg.model || '';
   $('#vLang').value = voiceCfg.language || '';
   $('#vVocab').value = voiceCfg.vocabulary || '';
+  $('#vVolcAppId').value = voiceCfg.volcAppId || '';
+  $('#vVolcCluster').value = voiceCfg.volcCluster || '';
+  syncVoiceFields();
   syncVoiceKeyHint();
+}
+
+// Volcengine takes an appid/token/cluster triple instead of a model name.
+function syncVoiceFields() {
+  const p = providers.find(x => x.id === pickedVoiceProvider);
+  const volc = p?.custom === 'volcengine';
+  $('#vVolcFields').hidden = !volc;
+  $('#vModelField').hidden = volc;
 }
 
 function pickVoiceProvider(p) {
   pickedVoiceProvider = p.id;
-  renderCards($('#vProviderCards'), pickedVoiceProvider, pickVoiceProvider);
+  renderCards($('#vProviderCards'), pickedVoiceProvider, pickVoiceProvider, canVoice);
+  if (p.models?.length && p.custom !== 'volcengine') $('#vModel').value = p.models[0];
+  syncVoiceFields();
   syncVoiceKeyHint();
 }
 
 function syncVoiceKeyHint() {
   const p = providers.find(x => x.id === pickedVoiceProvider);
+  const saved = voiceCfg?.hasKey && p?.id === voiceCfg.providerId;
   $('#vKey').placeholder = p?.auth === 'none'
     ? '本地服务，不需要 key'
-    : (voiceCfg?.hasKey && p?.id === voiceCfg.providerId ? '已保存，留空则不修改' : '粘贴你的 API Key');
+    : p?.custom === 'volcengine'
+      ? (saved ? '已保存，留空则不修改' : '粘贴 Access Token')
+      : (saved ? '已保存，留空则不修改' : '粘贴你的 API Key');
 }
 
 async function startRecording() {

@@ -30,6 +30,14 @@ type Provider struct {
 	Free bool `json:"free"`
 	// Notes explains the tradeoff to the user in the settings UI.
 	Notes string `json:"notes"`
+	// Chat and Voice say what this provider can actually do. DeepSeek has
+	// no speech API at all, so offering it for transcription only produces
+	// a 404 the user cannot diagnose.
+	Chat  bool `json:"chat"`
+	Voice bool `json:"voice"`
+	// Custom marks a provider that is not OpenAI-compatible and needs its
+	// own fields in the settings UI.
+	Custom string `json:"custom,omitempty"`
 }
 
 // Catalog is the built-in provider list.
@@ -45,6 +53,8 @@ var Catalog = []Provider{
 		Models:  []string{"qwen3", "llama3.2", "gemma3"},
 		Free:    true,
 		Notes:   "完全本地运行，不花钱、不联网、稿件不出本机。需要先装 Ollama 并拉一个模型。",
+
+		Chat: true,
 	},
 	{
 		ID:      "lmstudio",
@@ -54,6 +64,8 @@ var Catalog = []Provider{
 		Models:  []string{"local-model"},
 		Free:    true,
 		Notes:   "同样本地运行，带图形界面，适合不想用命令行的用户。",
+
+		Chat: true,
 	},
 	{
 		ID:      "openrouter",
@@ -67,6 +79,8 @@ var Catalog = []Provider{
 		},
 		Free:  true,
 		Notes: "注册后拿一个 key，带 :free 后缀的模型不计费（有速率限制）。一个 key 通吃几十家模型。",
+
+		Chat: true,
 	},
 	{
 		ID:      "deepseek",
@@ -75,6 +89,8 @@ var Catalog = []Provider{
 		Auth:    AuthAPIKey,
 		Models:  []string{"deepseek-chat", "deepseek-reasoner"},
 		Notes:   "中文写作质量好且便宜，推荐作为日常主力。",
+
+		Chat: true,
 	},
 	{
 		ID:      "siliconflow",
@@ -84,6 +100,9 @@ var Catalog = []Provider{
 		Models:  []string{"Qwen/Qwen3-8B", "deepseek-ai/DeepSeek-V3"},
 		Free:    true,
 		Notes:   "国内直连不用代理，部分小模型免费，也提供语音转写。",
+
+		Chat:  true,
+		Voice: true,
 	},
 	{
 		ID:      "groq",
@@ -93,6 +112,20 @@ var Catalog = []Provider{
 		Models:  []string{"llama-3.3-70b-versatile", "whisper-large-v3-turbo"},
 		Free:    true,
 		Notes:   "免费额度大、速度极快，语音转写首选。",
+
+		Chat:  true,
+		Voice: true,
+	},
+	{
+		ID:      "volcengine",
+		Name:    "火山引擎",
+		BaseURL: "", // not OpenAI-compatible; handled by its own client
+		Auth:    AuthAPIKey,
+		Models:  []string{"语音识别"},
+		Custom:  "volcengine",
+		Notes:   "字节跳动语音识别，中文准确率高。需要在控制台创建应用，填 AppID 和 Access Token。",
+
+		Voice: true,
 	},
 	{
 		ID:      "openai",
@@ -101,6 +134,9 @@ var Catalog = []Provider{
 		Auth:    AuthAPIKey,
 		Models:  []string{"gpt-4o-mini", "gpt-4o", "whisper-1"},
 		Notes:   "质量稳定，按量付费。",
+
+		Chat:  true,
+		Voice: true,
 	},
 }
 
