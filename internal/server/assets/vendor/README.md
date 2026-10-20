@@ -19,9 +19,12 @@ bundles gives each its own copy of `@codemirror/state`, and the
 `instanceof` checks that validate extensions then fail across the bundle
 boundary with "Unrecognized extension value in extension set".
 
-`basicSetup` also ships no highlight style, so `@codemirror/language` is
-needed for `syntaxHighlighting(defaultHighlightStyle)` — without it the
-markdown parser produces tokens that nothing renders.
+`basicSetup` also ships no highlight style, so the markdown parser's tokens
+render as plain text unless a highlighter is added. cowrite uses
+`tagHighlighter` from `@lezer/highlight` to give each token a `tok-*`
+class, so the colours come from CSS variables and follow the selected
+writing background rather than being fixed in JavaScript. Import it from
+the same bundle: `@lezer/highlight` must also exist exactly once.
 
 ## Rebuilding
 
@@ -30,7 +33,8 @@ npm install codemirror@6.0.2 @codemirror/lang-markdown@6.3.1 @codemirror/languag
 cat > entry.js <<'JS'
 export { EditorView, basicSetup } from "codemirror";
 export { markdown } from "@codemirror/lang-markdown";
-export { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+export { syntaxHighlighting } from "@codemirror/language";
+export { tagHighlighter, tags } from "@lezer/highlight";
 JS
 npx esbuild entry.js --bundle --format=esm --target=es2020 --minify --outfile=codemirror.js
 ```
