@@ -343,7 +343,10 @@
   }
   body.solo #preview { display: none; }
   body.solo #editor { width: 100%; }
-  body.solo #rich { padding-inline: max(40px, calc((100cqw - 760px) / 2)); }
+  body.solo #rich, body.rich #rich { padding-inline: max(40px, calc((100cqw - 760px) / 2)); }
+  body.rich #preview { display: none; }
+  /* The toggle does nothing while the mode itself hides the preview. */
+  body.rich #toggle, body.focus #toggle { display: none; }
 
   /* Rich text: the same writing surface, with markup rendered instead of
      shown as syntax. */
@@ -1157,7 +1160,7 @@ async function refreshStats() {
 }
 
 async function renderPreview() {
-  if (panesEl.style.display === 'none') return;
+  if (panesEl.style.display === 'none' || mode !== 'markdown') return;
   try {
     const r = await api('POST', '/render',
       { body: editor.value, profile: 'preview', theme });
@@ -2352,12 +2355,15 @@ async function applyMode(next) {
   localStorage.setItem('cw.mode', mode);
   modeSel.value = mode;
   document.body.classList.toggle('focus', mode === 'focus');
+  // Rich text already shows the rendered article, so a preview beside it
+  // would only repeat it.
+  document.body.classList.toggle('rich', mode === 'rich');
 
   const rich = mode === 'rich';
   richEl.style.display = rich ? '' : 'none';
   editor.style.display = rich ? 'none' : '';
   if (rich) await showRich();
-  if (mode !== 'focus') renderPreview();
+  if (mode === 'markdown') renderPreview();
 }
 
 modeSel.onchange = () => applyMode(modeSel.value);
