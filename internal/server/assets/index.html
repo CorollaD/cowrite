@@ -253,6 +253,52 @@
     #sidebar { width: 236px; }
   }
 
+  /* ---- Format bar ------------------------------------------------- */
+
+  /* Shown only while a post is open, and never in focus mode, which exists
+     to keep the screen empty. */
+  #fmt {
+    display: none; flex: none; align-items: center; gap: 2px;
+    height: 42px; padding: 0 14px; overflow-x: auto; scrollbar-width: none;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+  }
+  #fmt::-webkit-scrollbar { display: none; }
+  body.editing:not(.focus) #fmt { display: flex; }
+  #fmt .sep { height: 18px; margin: 0 5px; }
+  #fmt button.icon { width: 30px; height: 30px; color: var(--text); font-size: 14px; }
+  #fmt button.icon .ico { color: var(--muted); }
+  #fmt button.icon:hover .ico { color: var(--text); }
+  #fmt button.on { background: var(--tint); color: var(--accent); }
+  #fmt button.on .ico { color: var(--accent); }
+  #fmt b { font-weight: 800; }
+  #fmt .glyph-i { font-family: Georgia, serif; font-style: italic; font-weight: 600; font-size: 15px; }
+  #fmt u, #fmt s { font-weight: 600; }
+  #fmt select { height: 28px; max-width: 92px; font-size: 12.5px; background-color: var(--panel); }
+  #fmtBlock { width: 80px; }
+  .glyph-a { position: relative; font-weight: 700; font-size: 14px; line-height: 1; padding-bottom: 4px; }
+  #fmtColorBar {
+    position: absolute; left: -2px; right: -2px; bottom: 0; height: 3px;
+    border-radius: 2px; background: var(--accent);
+  }
+  .pal-wrap { position: relative; }
+  .palette {
+    display: none; position: fixed; z-index: 30;
+    grid-template-columns: repeat(5, 24px); gap: 6px; padding: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: var(--shadow-lg);
+  }
+  .palette.open { display: grid; }
+  .palette button {
+    width: 24px; height: 24px; padding: 0; border-radius: 6px;
+    border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  }
+  .palette button:hover { transform: scale(1.12); background-clip: padding-box; }
+  .palette .clear {
+    grid-column: 1 / -1; width: auto; height: 26px; font-size: 12px;
+    background: var(--sunken); color: var(--muted);
+  }
+  .palette .clear:hover { transform: none; color: var(--text); }
+
   /* ---- Writing surfaces ------------------------------------------- */
 
   /* A query container, so panes can centre their text against their own
@@ -590,6 +636,17 @@
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11.5M7 10.5l5 5 5-5M4.5 20.5h15"/></symbol>
     <symbol id="i-send" viewBox="0 0 24 24"><path d="M21.5 2.5 10.5 13.5"/><path d="m21.5 2.5-7 19-4-8-8-4z"/></symbol>
     <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><path d="M6 17h3l2-4V7H5v6h3zM14 17h3l2-4V7h-6v6h3z"/></symbol>
+    <symbol id="i-ul" viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4" cy="6" r="1.2"/><circle cx="4" cy="12" r="1.2"/><circle cx="4" cy="18" r="1.2"/></symbol>
+    <symbol id="i-ol" viewBox="0 0 24 24"><path d="M10 6h11M10 12h11M10 18h11"/><path d="M4 5h1v4M4 9h2"/><path d="M6 19H4c0-1 2-1.6 2-2.6S5 15 4 15.4"/></symbol>
+    <symbol id="i-hr" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M7 6h10M7 18h10" opacity=".35"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m16 18 6-6-6-6M8 6l-6 6 6 6"/></symbol>
+    <symbol id="i-codeblock" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="m10 10-2 2 2 2M14 10l2 2-2 2"/></symbol>
+    <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M3 15h18M10 4v16"/></symbol>
+    <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21"/><path d="M22 21H7M5 11l9 9"/></symbol>
+    <symbol id="i-hilite" viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></symbol>
     <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
   </svg>
 
@@ -656,6 +713,43 @@
         <p>选一篇文章继续写，或者新建一篇。<br>文章以 Markdown 文件保存在你自己的目录里。</p>
         <button id="emptyNew" class="primary"><svg class="ico"><use href="#i-plus"/></svg>新建文章</button>
       </div>
+    </div>
+    <div id="fmt" role="toolbar" aria-label="格式">
+      <select id="fmtBlock" title="段落样式">
+        <option value="p">正文</option>
+        <option value="h1">标题 1</option>
+        <option value="h2">标题 2</option>
+        <option value="h3">标题 3</option>
+      </select>
+      <span class="sep"></span>
+      <button class="icon" data-fmt="bold" title="加粗（⌘B）"><b>B</b></button>
+      <button class="icon" data-fmt="italic" title="斜体（⌘I）"><i class="glyph-i">I</i></button>
+      <button class="icon" data-fmt="underline" title="下划线（⌘U）"><u>U</u></button>
+      <button class="icon" data-fmt="strike" title="删除线（⌘⇧X）"><s>S</s></button>
+      <span class="sep"></span>
+      <select id="fmtFont" title="字体"></select>
+      <select id="fmtSize" title="字号"></select>
+      <div class="pal-wrap">
+        <button class="icon" id="fmtColor" title="文字颜色"><span class="glyph-a">A<i id="fmtColorBar"></i></span></button>
+        <div class="palette" id="palColor"></div>
+      </div>
+      <div class="pal-wrap">
+        <button class="icon" id="fmtHilite" title="背景高亮"><svg class="ico"><use href="#i-hilite"/></svg></button>
+        <div class="palette" id="palHilite"></div>
+      </div>
+      <span class="sep"></span>
+      <button class="icon" data-fmt="quote" title="引用"><svg class="ico"><use href="#i-quote"/></svg></button>
+      <button class="icon" data-fmt="ul" title="无序列表"><svg class="ico"><use href="#i-ul"/></svg></button>
+      <button class="icon" data-fmt="ol" title="有序列表"><svg class="ico"><use href="#i-ol"/></svg></button>
+      <button class="icon" data-fmt="hr" title="分割线"><svg class="ico"><use href="#i-hr"/></svg></button>
+      <span class="sep"></span>
+      <button class="icon" data-fmt="link" title="链接（⌘K）"><svg class="ico"><use href="#i-link"/></svg></button>
+      <button class="icon" data-fmt="image" title="图片"><svg class="ico"><use href="#i-image"/></svg></button>
+      <button class="icon" data-fmt="code" title="行内代码（⌘E）"><svg class="ico"><use href="#i-code"/></svg></button>
+      <button class="icon" data-fmt="codeblock" title="代码块"><svg class="ico"><use href="#i-codeblock"/></svg></button>
+      <button class="icon" data-fmt="table" title="表格"><svg class="ico"><use href="#i-table"/></svg></button>
+      <span class="sep"></span>
+      <button class="icon" data-fmt="clear" title="清除格式"><svg class="ico"><use href="#i-eraser"/></svg></button>
     </div>
     <div id="panes" style="display:none">
       <div id="editor"></div>
@@ -881,7 +975,7 @@
 import {
   EditorView, basicSetup, markdown,
   syntaxHighlighting, tagHighlighter, tags,
-  Decoration, ViewPlugin, MatchDecorator, WidgetType,
+  Decoration, ViewPlugin, MatchDecorator, WidgetType, keymap, Prec,
 } from './vendor/codemirror.js';
 
 // A pasted image arrives as a base64 data URI, thousands of characters on
@@ -948,7 +1042,7 @@ const $ = s => document.querySelector(s);
 // against `value`, `selectionStart` and `selectionEnd`. Exposing those on
 // the view keeps thirty call sites unchanged and keeps the editor
 // swappable later.
-function createEditor(mount, { onInput, onBlur }) {
+function createEditor(mount, { onInput, onBlur, onSelection }) {
   const view = new EditorView({
     parent: mount,
     doc: '',
@@ -960,7 +1054,18 @@ function createEditor(mount, { onInput, onBlur }) {
       EditorView.lineWrapping,
       EditorView.updateListener.of(u => {
         if (u.docChanged) onInput?.();
+        if (u.docChanged || u.selectionSet) onSelection?.();
       }),
+      // High precedence: the default keymap binds Mod-i to selecting the
+      // parent syntax node, which would swallow italic.
+      Prec.high(keymap.of([
+        { key: 'Mod-b', run: () => formatCommand('bold') },
+        { key: 'Mod-i', run: () => formatCommand('italic') },
+        { key: 'Mod-u', run: () => formatCommand('underline') },
+        { key: 'Mod-Shift-x', run: () => formatCommand('strike') },
+        { key: 'Mod-e', run: () => formatCommand('code') },
+        { key: 'Mod-k', run: () => formatCommand('link') },
+      ])),
       EditorView.domEventHandlers({ blur: () => { onBlur?.(); } }),
     ],
   });
@@ -999,6 +1104,7 @@ let renderTimer = null;
 const editor = createEditor($('#editor'), {
   onInput: () => handleEditorInput(),
   onBlur: () => save(),
+  onSelection: () => syncFormatState(),
 });
 
 let current = null;   // { id, hash }
@@ -1069,6 +1175,7 @@ async function deletePost(p) {
   if (current?.id === p.id) {
     current = null;
     panesEl.style.display = 'none';
+    document.body.classList.remove('editing');
     emptyEl.style.display = '';
     setStatus('选择或新建一篇文章');
     updateAIButtons();
@@ -1083,6 +1190,7 @@ async function open(id) {
   current = { id: p.id, hash: p.hash };
   editor.value = p.body;
   panesEl.style.display = '';
+  document.body.classList.add('editing');
   emptyEl.style.display = 'none';
   dirty = false;
   externalPending = false;
@@ -2492,6 +2600,420 @@ dropZone.addEventListener('drop', e => {
 
 volEl.value = String(Ambience.getVolume());
 volEl.oninput = () => Ambience.volume(Number(volEl.value));
+
+// ---- 格式栏 -------------------------------------------------------------
+
+// One command set, two implementations. Rich text uses the browser's own
+// editing commands; markdown inserts syntax through CodeMirror, so each
+// action is a single undoable step and the cursor lands where expected.
+//
+// Colour, size and font have no markdown syntax. In both modes they are
+// written as an inline <span style>, which the renderer passes through and
+// the WeChat export keeps; see FilterStyle in render/tomarkdown.go for the
+// properties that survive.
+
+const TEXT_COLORS = [
+  '#d0312d', '#e8710a', '#c49000', '#2e7d32', '#00838f',
+  '#1565c0', '#5e35b1', '#ad1457', '#616161', '#212121',
+];
+const HILITE_COLORS = [
+  '#fff3a3', '#ffe0b2', '#d4f4dd', '#d6eefc', '#e8deff',
+  '#fde2e4', '#e0f2f1', '#f5f5f5', '#ffd6d6', '#e3f2c1',
+];
+const FONTS = [
+  ['', '字体'],
+  ['__clear', '默认字体'],
+  ['"Songti SC", "SimSun", serif', '宋体'],
+  ['"Kaiti SC", "STKaiti", "KaiTi", serif', '楷体'],
+  ['"PingFang SC", "Microsoft YaHei", sans-serif', '黑体'],
+  ['ui-monospace, Menlo, monospace', '等宽'],
+];
+const SIZES = [
+  ['', '字号'], ['__clear', '默认字号'],
+  ['13px', '13'], ['14px', '14'], ['16px', '16'],
+  ['18px', '18'], ['20px', '20'], ['24px', '24'], ['28px', '28'],
+];
+
+const fmtBar = $('#fmt'), fmtBlock = $('#fmtBlock'),
+      fmtFont = $('#fmtFont'), fmtSize = $('#fmtSize');
+
+for (const [v, label] of FONTS) fmtFont.add(new Option(label, v));
+for (const [v, label] of SIZES) fmtSize.add(new Option(label, v));
+
+const escapeHTML = t => t.replace(/[&<>"]/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---- rich text ----
+
+// Clicking a toolbar control moves focus out of the editor and the browser
+// forgets the selection, so the last selection inside it is kept here and
+// put back before each command.
+let richRange = null;
+document.addEventListener('selectionchange', () => {
+  const sel = getSelection();
+  if (sel.rangeCount && richEl.contains(sel.anchorNode)) {
+    richRange = sel.getRangeAt(0).cloneRange();
+    if (mode === 'rich') syncFormatState();
+  }
+});
+
+function restoreRich() {
+  richEl.focus();
+  if (!richRange) return;
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(richRange);
+}
+
+function exec(cmd, value = null, css = false) {
+  // CSS mode only for the commands that need a span with a style;
+  // otherwise bold would come out as <span style="font-weight">, which
+  // markdown cannot represent.
+  document.execCommand('styleWithCSS', false, css);
+  document.execCommand(cmd, false, value);
+  document.execCommand('styleWithCSS', false, false);
+}
+
+// The browser has no command for "font size 18px" or "no colour". Each is
+// applied with a marker value the browser does support, and the resulting
+// spans are then rewritten to the real value.
+function applyMarkedStyle(cmd, marker, matches, apply) {
+  exec(cmd, marker, true);
+  for (const el of richEl.querySelectorAll('span[style], font')) {
+    if (matches(el)) apply(el);
+  }
+}
+
+// formatBlock reports nothing for text sitting directly in a blockquote,
+// so the selection's ancestors are checked instead.
+function inRichQuote() {
+  const anchor = getSelection().anchorNode;
+  const el = anchor?.nodeType === Node.TEXT_NODE ? anchor.parentElement : anchor;
+  return Boolean(el?.closest?.('#rich blockquote'));
+}
+
+const SENTINEL = '#010203', SENTINEL_RGB = 'rgb(1, 2, 3)';
+
+const rich = {
+  bold: () => exec('bold'),
+  italic: () => exec('italic'),
+  underline: () => exec('underline'),
+  strike: () => exec('strikeThrough'),
+  block: tag => exec('formatBlock', `<${tag}>`),
+  quote: () => {
+    // formatBlock <p> nests a paragraph inside the quote; outdent is
+    // what takes the text back out of it.
+    if (inRichQuote()) exec('outdent');
+    else exec('formatBlock', '<blockquote>');
+  },
+  ul: () => exec('insertUnorderedList'),
+  ol: () => exec('insertOrderedList'),
+  hr: () => exec('insertHorizontalRule'),
+  link: () => {
+    const url = prompt('链接地址', 'https://');
+    if (!url) return;
+    const sel = getSelection();
+    if (sel.isCollapsed) exec('insertHTML', `<a href="${escapeHTML(url)}">${escapeHTML(url)}</a>`);
+    else exec('createLink', url);
+  },
+  image: () => {
+    const url = prompt('图片地址', 'https://');
+    if (url) exec('insertImage', url);
+  },
+  code: () => {
+    const text = getSelection().toString() || '代码';
+    exec('insertHTML', `<code>${escapeHTML(text)}</code>`);
+  },
+  codeblock: () => exec('formatBlock', '<pre>'),
+  table: () => exec('insertHTML',
+    '<table><thead><tr><th>列 1</th><th>列 2</th><th>列 3</th></tr></thead>' +
+    '<tbody><tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>' +
+    '<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table><p><br></p>'),
+  clear: () => {
+    exec('removeFormat');
+    exec('unlink');
+  },
+  color: c => c
+    ? exec('foreColor', c, true)
+    : applyMarkedStyle('foreColor', SENTINEL,
+        el => el.style.color === SENTINEL_RGB || el.getAttribute('color') === SENTINEL,
+        el => { el.style.color = ''; el.removeAttribute('color'); }),
+  hilite: c => c
+    ? exec('hiliteColor', c, true)
+    : applyMarkedStyle('hiliteColor', SENTINEL,
+        el => el.style.backgroundColor === SENTINEL_RGB,
+        el => { el.style.backgroundColor = ''; }),
+  size: px => applyMarkedStyle('fontSize', 7,
+    el => el.style.fontSize === 'xxx-large' || el.getAttribute('size') === '7',
+    el => { el.style.fontSize = px || ''; el.removeAttribute('size'); }),
+  font: family => applyMarkedStyle('fontName', 'cw-font-marker',
+    el => (el.style.fontFamily || el.getAttribute('face') || '').includes('cw-font-marker'),
+    el => { el.style.fontFamily = family || ''; el.removeAttribute('face'); }),
+};
+
+function runRich(name, arg) {
+  restoreRich();
+  rich[name](arg);
+  // Not every command fires input, and saving depends on it.
+  richEl.dispatchEvent(new Event('input'));
+  syncFormatState();
+}
+
+// ---- markdown ----
+
+function mdView() { return editor.view; }
+
+// Wraps the selection in markers, or unwraps it when it already is, so the
+// same button turns bold on and off.
+function mdWrap(before, after = before, placeholder = '文字') {
+  const v = mdView(), st = v.state, { from, to } = st.selection.main;
+  const text = st.sliceDoc(from, to);
+  const outerBefore = st.sliceDoc(Math.max(0, from - before.length), from);
+  const outerAfter = st.sliceDoc(to, to + after.length);
+
+  // A lone * next to another * belongs to bold, not italic: unwrapping it
+  // would turn **bold** into *italic*.
+  const partOfLonger = before.length === 1 &&
+    st.sliceDoc(Math.max(0, from - 2), from - 1) === before;
+
+  if (before && !partOfLonger && outerBefore === before && outerAfter === after) {
+    v.dispatch({
+      changes: [{ from: from - before.length, to: from }, { from: to, to: to + after.length }],
+      selection: { anchor: from - before.length, head: to - before.length },
+    });
+  } else if (text.length > before.length + after.length &&
+             text.startsWith(before) && text.endsWith(after)) {
+    const inner = text.slice(before.length, text.length - after.length);
+    v.dispatch({
+      changes: { from, to, insert: inner },
+      selection: { anchor: from, head: from + inner.length },
+    });
+  } else {
+    const inner = text || placeholder;
+    v.dispatch({
+      changes: { from, to, insert: before + inner + after },
+      selection: { anchor: from + before.length, head: from + before.length + inner.length },
+    });
+  }
+  v.focus();
+}
+
+// Applies a prefix to every line the selection touches. If every line
+// already has it, it is removed instead.
+function mdLines(prefixFor, strip) {
+  const v = mdView(), st = v.state, { from, to } = st.selection.main;
+  const first = st.doc.lineAt(from).number, last = st.doc.lineAt(to).number;
+  const lines = [];
+  for (let n = first; n <= last; n++) lines.push(st.doc.line(n));
+
+  const allHave = lines.every((l, i) => l.text.startsWith(prefixFor(i)));
+  const changes = lines.map((l, i) => {
+    const existing = (l.text.match(strip) || [''])[0];
+    const insert = allHave ? '' : prefixFor(i);
+    return { from: l.from, to: l.from + existing.length, insert };
+  });
+  v.dispatch({ changes });
+  v.focus();
+}
+
+// Inserts a block on its own lines, with a blank line either side. By
+// default it goes after the line the cursor is on, leaving any selected
+// text alone; `replace` is for blocks built from the selection itself.
+function mdBlock(text, selectFrom = 0, selectLen = 0, replace = false) {
+  const v = mdView(), st = v.state;
+  let { from, to } = st.selection.main;
+  if (!replace) {
+    const end = st.doc.lineAt(to).to;
+    from = to = end;
+  }
+  const before = st.sliceDoc(Math.max(0, from - 2), from);
+  const lead = from === 0 ? '' : before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  const insert = lead + text + '\n\n';
+  const start = from + lead.length + selectFrom;
+  v.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: start, head: start + selectLen },
+  });
+  v.focus();
+}
+
+// Removes inline markup and style spans from the selection.
+function mdClear() {
+  const v = mdView(), st = v.state, { from, to } = st.selection.main;
+  if (from === to) return v.focus();
+  const plain = st.sliceDoc(from, to)
+    .replace(/<\/?(span|u|font)\b[^>]*>/g, '')
+    .replace(/(\*\*|__|~~|\*|_|`)(.+?)\1/g, '$2')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1');
+  v.dispatch({ changes: { from, to, insert: plain }, selection: { anchor: from, head: from + plain.length } });
+  v.focus();
+}
+
+function mdStyle(prop, value) {
+  if (!value) return mdClear();
+  mdWrap(`<span style="${prop}: ${value}">`, '</span>');
+}
+
+const heading = /^(#{1,6}\s+|>\s?|[-*+]\s+(\[[ x]\]\s+)?|\d+\.\s+)?/;
+
+const md = {
+  bold: () => mdWrap('**'),
+  italic: () => mdWrap('*'),
+  underline: () => mdWrap('<u>', '</u>'),
+  strike: () => mdWrap('~~'),
+  block: tag => {
+    const marks = { p: '', h1: '# ', h2: '## ', h3: '### ' }[tag] ?? '';
+    // Headings replace each other rather than stacking, and "正文"
+    // simply removes the heading.
+    const v = mdView(), st = v.state;
+    const line = st.doc.lineAt(st.selection.main.head);
+    const existing = (line.text.match(/^#{1,6}\s+/) || [''])[0];
+    v.dispatch({ changes: { from: line.from, to: line.from + existing.length, insert: marks } });
+    v.focus();
+  },
+  quote: () => mdLines(() => '> ', /^>\s?/),
+  ul: () => mdLines(() => '- ', heading),
+  ol: () => mdLines(i => `${i + 1}. `, heading),
+  hr: () => mdBlock('---'),
+  link: () => {
+    const v = mdView(), st = v.state, { from, to } = st.selection.main;
+    const text = st.sliceDoc(from, to) || '链接文字';
+    const insert = `[${text}](https://)`;
+    // Leave the address selected, since it is what has to be typed next.
+    const urlAt = from + text.length + 3;
+    v.dispatch({ changes: { from, to, insert }, selection: { anchor: urlAt, head: urlAt + 8 } });
+    v.focus();
+  },
+  image: () => mdBlock('![图片描述](https://)', 8, 8),
+  code: () => mdWrap('`', '`', '代码'),
+  codeblock: () => {
+    const v = mdView(), st = v.state, { from, to } = st.selection.main;
+    const body = st.sliceDoc(from, to) || '代码';
+    mdBlock('```\n' + body + '\n```', 4, body.length, true);
+  },
+  table: () => mdBlock('| 列 1 | 列 2 | 列 3 |\n| --- | --- | --- |\n|  |  |  |\n|  |  |  |', 2, 3),
+  clear: () => mdClear(),
+  color: c => mdStyle('color', c),
+  hilite: c => mdStyle('background-color', c),
+  size: px => mdStyle('font-size', px),
+  font: family => mdStyle('font-family', family),
+};
+
+// ---- shared ----
+
+function formatCommand(name, arg) {
+  if (!current) return false;
+  if (mode === 'rich') runRich(name, arg);
+  else md[name](arg);
+  return true;
+}
+
+// Reflects where the cursor is: bold lit while inside bold text, and the
+// paragraph menu showing the current block.
+function syncFormatState() {
+  if (!document.body.classList.contains('editing')) return;
+  const on = {};
+  let block = 'p';
+  if (mode === 'rich') {
+    for (const [name, cmd] of [['bold', 'bold'], ['italic', 'italic'],
+                               ['underline', 'underline'], ['strike', 'strikeThrough'],
+                               ['ul', 'insertUnorderedList'], ['ol', 'insertOrderedList']]) {
+      try { on[name] = document.queryCommandState(cmd); } catch {}
+    }
+    const b = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+    if (/^h[1-3]$/.test(b)) block = b;
+    on.quote = inRichQuote();
+  } else {
+    const st = editor.view.state;
+    const line = st.doc.lineAt(st.selection.main.head).text;
+    const m = line.match(/^(#{1,3})\s/);
+    if (m) block = 'h' + m[1].length;
+    on.quote = /^>\s?/.test(line);
+    on.ul = /^\s*[-*+]\s/.test(line);
+    on.ol = /^\s*\d+\.\s/.test(line);
+  }
+  for (const btn of fmtBar.querySelectorAll('button[data-fmt]')) {
+    btn.classList.toggle('on', Boolean(on[btn.dataset.fmt]));
+  }
+  fmtBlock.value = block;
+}
+
+// Buttons must not take focus, or rich text loses its selection and
+// CodeMirror its cursor before the command runs.
+fmtBar.addEventListener('mousedown', e => {
+  if (e.target.closest('button')) e.preventDefault();
+});
+for (const btn of fmtBar.querySelectorAll('button[data-fmt]')) {
+  btn.onclick = () => formatCommand(btn.dataset.fmt);
+}
+
+fmtBlock.onchange = () => formatCommand('block', fmtBlock.value);
+
+// Font and size are actions rather than state, so the menu returns to its
+// label after each use.
+for (const [sel, name] of [[fmtFont, 'font'], [fmtSize, 'size']]) {
+  sel.onchange = () => {
+    const v = sel.value;
+    sel.value = '';
+    if (v) formatCommand(name, v === '__clear' ? '' : v);
+  };
+}
+
+function buildPalette(el, colors, onPick, clearLabel) {
+  el.innerHTML = '';
+  for (const c of colors) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.background = c;
+    b.title = c;
+    b.onclick = () => { closePalettes(); onPick(c); };
+    el.append(b);
+  }
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'clear';
+  clear.textContent = clearLabel;
+  clear.onclick = () => { closePalettes(); onPick(''); };
+  el.append(clear);
+  el.addEventListener('mousedown', e => e.preventDefault());
+}
+
+function closePalettes() {
+  for (const p of document.querySelectorAll('.palette.open')) p.classList.remove('open');
+}
+
+// The bar scrolls horizontally, which would clip an absolutely positioned
+// menu, so palettes are fixed and placed under their button.
+function togglePalette(btn, pal) {
+  const wasOpen = pal.classList.contains('open');
+  closePalettes();
+  if (wasOpen) return;
+  const r = btn.getBoundingClientRect();
+  pal.style.left = Math.min(r.left, innerWidth - 170) + 'px';
+  pal.style.top = (r.bottom + 6) + 'px';
+  pal.classList.add('open');
+}
+
+buildPalette($('#palColor'), TEXT_COLORS, c => {
+  if (c) $('#fmtColorBar').style.background = c;
+  formatCommand('color', c);
+}, '清除颜色');
+buildPalette($('#palHilite'), HILITE_COLORS, c => formatCommand('hilite', c), '清除高亮');
+
+$('#fmtColor').onclick = e => { e.stopPropagation(); togglePalette($('#fmtColor'), $('#palColor')); };
+$('#fmtHilite').onclick = e => { e.stopPropagation(); togglePalette($('#fmtHilite'), $('#palHilite')); };
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('.palette, #fmtColor, #fmtHilite')) closePalettes();
+});
+addEventListener('resize', closePalettes);
+
+// Shortcuts the browser does not provide for rich text on its own.
+richEl.addEventListener('keydown', e => {
+  if (!(e.metaKey || e.ctrlKey)) return;
+  const k = e.key.toLowerCase();
+  const name = k === 'k' ? 'link' : k === 'e' ? 'code' : (k === 'x' && e.shiftKey) ? 'strike' : null;
+  if (name) { e.preventDefault(); formatCommand(name); }
+});
 
 loadThemes();
 loadAI();

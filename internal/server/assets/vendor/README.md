@@ -33,6 +33,8 @@ npm install codemirror@6.0.2 @codemirror/lang-markdown@6.3.1 @codemirror/languag
 cat > entry.js <<'JS'
 export { EditorView, basicSetup } from "codemirror";
 export { markdown } from "@codemirror/lang-markdown";
+export { Decoration, ViewPlugin, MatchDecorator, WidgetType, keymap } from "@codemirror/view";
+export { Prec } from "@codemirror/state";
 export { syntaxHighlighting } from "@codemirror/language";
 export { tagHighlighter, tags } from "@lezer/highlight";
 JS
