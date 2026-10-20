@@ -120,3 +120,17 @@ func TestWriteAtomicReplacesContent(t *testing.T) {
 		}
 	}
 }
+
+func TestDeriveTitleStripsInlineMarkup(t *testing.T) {
+	cases := map[string]string{
+		"**\"去宁化\"真相：不是反宁王**\n\n正文": "\"去宁化\"真相：不是反宁王",
+		"# 用 `go test` 跑测试":         "用 go test 跑测试",
+		"[链接标题](https://x.com) 之后":  "链接标题 之后",
+		"*斜体开头*":                    "斜体开头",
+	}
+	for body, want := range cases {
+		if got := DeriveTitle(body); got != want {
+			t.Errorf("DeriveTitle(%q) = %q, want %q", body, got, want)
+		}
+	}
+}

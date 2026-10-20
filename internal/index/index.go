@@ -28,6 +28,14 @@ func New(ws *workspace.Workspace, db *store.DB, log *slog.Logger) *Index {
 //
 // Files whose size and mtime are unchanged are skipped without hashing,
 // which keeps startup cheap on a large workspace.
+// indexVersion is bumped whenever what gets derived from a file changes,
+// such as how words are counted or titles cleaned. Unchanged files are
+// normally skipped, so without this an existing post would keep the old
+// numbers until someone happened to edit it.
+const indexVersion = "2"
+
+const settingIndexVersion = "index.version"
+
 func (ix *Index) Sync() error {
 	entries, err := ix.ws.Scan()
 	if err != nil {
@@ -39,11 +47,18 @@ func (ix *Index) Sync() error {
 		return err
 	}
 
+	stored, _ := ix.db.GetSetting(settingIndexVersion)
+	rebuild := stored != indexVersion
+	if rebuild {
+		ix.log.Info("index format changed, reindexing every post",
+			"from", stored, "to", indexVersion)
+	}
+
 	seen := make(map[string]bool, len(entries))
 	for _, e := range entries {
 		seen[e.RelPath] = true
 
-		if prior, ok := known[e.RelPath]; ok &&
+		if prior, ok := known[e.RelPath]; ok && !rebuild &&
 			prior.Size == e.Size &&
 			prior.MTime == e.MTime.Unix() &&
 			prior.DeletedAt == nil {
@@ -51,6 +66,12 @@ func (ix *Index) Sync() error {
 		}
 		if err := ix.upsert(e); err != nil {
 			ix.log.Warn("index entry failed", "path", e.RelPath, "err", err)
+		}
+	}
+
+	if rebuild {
+		if err := ix.db.SetSetting(settingIndexVersion, indexVersion); err != nil {
+			ix.log.Warn("record index version failed", "err", err)
 		}
 	}
 
@@ -107,7 +128,7 @@ func (ix *Index) upsert(e workspace.Entry) error {
 	return ix.db.UpsertPost(&store.Post{
 		ID:          post.Meta.ID,
 		Path:        e.RelPath,
-		Title:       post.Meta.Title,
+		Title:       workspace.PlainTitle(post.Meta.Title),
 		Slug:        workspace.Slugify(post.Meta.Title),
 		Tags:        store.EncodeTags(post.Meta.Tags),
 		ContentHash: e.Hash,

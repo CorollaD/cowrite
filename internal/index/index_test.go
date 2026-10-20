@@ -132,3 +132,35 @@ func TestSyncIsIdempotent(t *testing.T) {
 		t.Errorf("ID changed across syncs: %s -> %s", first[0].ID, again[0].ID)
 	}
 }
+
+// Changing how posts are measured must reach posts nobody has edited
+// since; the size-and-mtime shortcut would otherwise keep stale numbers.
+func TestSyncReindexesWhenFormatChanges(t *testing.T) {
+	ix, ws, db := setup(t)
+	writePost(t, ws, "# 标题\n\n正文内容\n")
+	if err := ix.Sync(); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+
+	// Simulate an index written by an older version with a stale count.
+	posts, _ := db.ListPosts()
+	stale := posts[0]
+	stale.WordCount = 99999
+	if err := db.UpsertPost(&stale); err != nil {
+		t.Fatalf("seed stale row: %v", err)
+	}
+	if err := db.SetSetting(settingIndexVersion, "1"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+
+	if err := ix.Sync(); err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	posts, _ = db.ListPosts()
+	if posts[0].WordCount == 99999 {
+		t.Error("stale count survived a format change")
+	}
+	if v, _ := db.GetSetting(settingIndexVersion); v != indexVersion {
+		t.Errorf("index version = %q, want %q", v, indexVersion)
+	}
+}

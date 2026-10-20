@@ -3,6 +3,7 @@ package workspace
 import (
 	"bytes"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -107,12 +108,28 @@ func DeriveTitle(body string) string {
 			continue
 		}
 		if h, ok := strings.CutPrefix(line, "#"); ok {
-			if t := strings.TrimSpace(strings.TrimLeft(h, "#")); t != "" {
+			if t := PlainTitle(strings.TrimLeft(h, "#")); t != "" {
 				return t
 			}
 			continue
 		}
-		return line
+		if t := PlainTitle(line); t != "" {
+			return t
+		}
 	}
 	return "Untitled"
+}
+
+var (
+	titleLinkRe   = regexp.MustCompile(`!?\[([^\]]*)\]\([^)]*\)`)
+	titleMarkupRe = regexp.MustCompile("[*_`~]+")
+)
+
+// PlainTitle strips inline markdown from a line used as a title, so a
+// first line written as **bold** does not carry its asterisks into the
+// post list.
+func PlainTitle(line string) string {
+	line = titleLinkRe.ReplaceAllString(line, "$1")
+	line = titleMarkupRe.ReplaceAllString(line, "")
+	return strings.TrimSpace(line)
 }

@@ -1,9 +1,25 @@
 package workspace
 
 import (
+	"regexp"
 	"strings"
 	"unicode"
 )
+
+var (
+	// An embedded image is thousands of base64 characters; counted as
+	// text it inflates a short note to tens of thousands of words.
+	dataURIRe = regexp.MustCompile(`data:[\w/+.-]+;base64,[A-Za-z0-9+/=]+`)
+	// Link and image targets are addresses, not prose.
+	linkTargetRe = regexp.MustCompile(`\]\([^)\s]*(?:\s+"[^"]*")?\)`)
+)
+
+// proseOnly drops the parts of markdown that are not writing, so counts
+// reflect what someone actually wrote.
+func proseOnly(body string) string {
+	body = dataURIRe.ReplaceAllString(body, "")
+	return linkTargetRe.ReplaceAllString(body, "]")
+}
 
 // Stats describes the size and shape of a draft.
 //
@@ -36,6 +52,7 @@ const readingSpeed = 400
 func Analyze(body string) Stats {
 	var s Stats
 	inWord := false
+	body = proseOnly(body)
 
 	for _, r := range body {
 		s.Characters++
