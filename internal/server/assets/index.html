@@ -1564,26 +1564,65 @@ $('#aiSave').onclick = async () => {
   }
 };
 
+// The selected text, from whichever surface is being written in. In rich
+// text the selection lives in the page, not in the hidden markdown editor,
+// so reading the editor there gave a stale range or none at all, and a
+// command meant for one sentence ran on the whole article.
+function selectionScope() {
+  if (mode === 'rich') {
+    const r = richRange && richEl.contains(richRange.commonAncestorContainer) ? richRange.cloneRange() : null;
+    return r && r.toString().trim() ? { text: r.toString(), range: r } : null;
+  }
+  const start = editor.selectionStart, end = editor.selectionEnd;
+  const text = editor.value.slice(start, end);
+  return text.trim() ? { text, start, end } : null;
+}
+
+// Everything before the cursor, with the cursor as the insertion point.
+function cursorScope() {
+  if (mode === 'rich') {
+    const at = document.createRange();
+    if (richRange && richEl.contains(richRange.endContainer)) at.setStart(richRange.endContainer, richRange.endOffset);
+    else { at.selectNodeContents(richEl); at.collapse(false); }
+    at.collapse(true);
+    const before = document.createRange();
+    before.setStart(richEl, 0);
+    before.setEnd(at.startContainer, at.startOffset);
+    return { text: before.toString(), range: at, append: true };
+  }
+  const end = editor.selectionEnd;
+  return { text: editor.value.slice(0, end), start: end, end, append: true };
+}
+
 // Pick the text a command runs on: its selection, the text before the
 // cursor, or the whole document.
 function textFor(scope) {
-  const sel = editor.value.slice(editor.selectionStart, editor.selectionEnd);
-  if (scope === 'selection') {
-    return sel.trim()
-      ? { text: sel, start: editor.selectionStart, end: editor.selectionEnd }
-      : { text: editor.value, start: 0, end: editor.value.length };
-  }
-  if (scope === 'cursor') {
-    const end = editor.selectionEnd;
-    return { text: editor.value.slice(0, end), start: end, end, append: true };
-  }
-  return { text: editor.value, start: 0, end: editor.value.length, readonly: true };
+  const whole = { text: editor.value, start: 0, end: editor.value.length };
+  if (scope === 'selection') return selectionScope() || whole;
+  if (scope === 'cursor') return cursorScope();
+  return { ...whole, readonly: true };
+}
+
+// Puts a result where its rich-text range was. The result is markdown, so
+// it is rendered first; a one-line result goes in without its paragraph,
+// or replacing a few words would split the paragraph around them.
+async function insertIntoRich(range, md) {
+  const { html } = await api('POST', '/render', { body: md, profile: 'generic', theme });
+  const out = md.trim().includes('\n') ? html : html.trim().replace(/^<p>([\s\S]*)<\/p>$/, '$1');
+  richEl.focus();
+  const sel = getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  exec('insertHTML', out);
 }
 
 async function runCommand(id) {
   const cmd = commands.find(c => c.id === id);
   if (!cmd) return;
 
+  // The whole-article scopes read the markdown, which must include the
+  // latest rich-text edits.
+  if (mode === 'rich') await syncRichToEditor();
   const scope = textFor(cmd.scope);
   if (!scope.text.trim()) { toast('没有可处理的文字'); return; }
   lastScope = scope;
@@ -1647,11 +1686,17 @@ $('#resultInsert').onclick = async () => {
     return;
   }
 
-  const v = editor.value;
-  editor.value = lastScope.append
-    ? v.slice(0, lastScope.start) + out + v.slice(lastScope.start)
-    : v.slice(0, lastScope.start) + out + v.slice(lastScope.end);
   resultEl.classList.remove('show');
+  if (lastScope.range && mode === 'rich') {
+    await insertIntoRich(lastScope.range, out);
+    await syncRichToEditor();
+  } else {
+    const v = editor.value;
+    editor.value = lastScope.append
+      ? v.slice(0, lastScope.start) + out + v.slice(lastScope.start)
+      : v.slice(0, lastScope.start) + out + v.slice(lastScope.end);
+    if (mode === 'rich') await showRich();
+  }
   dirty = true;
   updateWords();
   renderPreview();
@@ -1815,10 +1860,9 @@ async function finishRecording() {
   rawToggle.style.display = '';
   rawToggle.textContent = '查看原始转写';
 
-  const sel = editor.value.slice(editor.selectionStart, editor.selectionEnd);
-  lastScope = sel.trim()
-    ? { start: editor.selectionStart, end: editor.selectionEnd }
-    : { start: editor.selectionEnd, end: editor.selectionEnd, append: true };
+  const picked = selectionScope();
+  const sel = picked?.text || '';
+  lastScope = picked || cursorScope();
 
   const fd = new FormData();
   fd.append('transcript', transcript);
@@ -1886,8 +1930,9 @@ async function sendAudio(blob) {
   fd.append('audio', blob, 'clip.webm');
   // With text selected, a short recording is treated as an instruction
   // about it rather than prose to insert.
-  const sel = editor.value.slice(editor.selectionStart, editor.selectionEnd);
-  if (sel.trim()) fd.append('selection', sel);
+  const picked = selectionScope();
+  const sel = picked?.text || '';
+  if (sel) fd.append('selection', sel);
 
   resultTitle.textContent = '转写中…';
   $('#resultInsert').textContent = '采用';
@@ -1896,9 +1941,7 @@ async function sendAudio(blob) {
   rawText.classList.remove('show');
   rawToggle.style.display = 'none';
   resultEl.classList.add('show');
-  lastScope = sel.trim()
-    ? { start: editor.selectionStart, end: editor.selectionEnd }
-    : { start: editor.selectionEnd, end: editor.selectionEnd, append: true };
+  lastScope = picked || cursorScope();
 
   let r;
   try {
