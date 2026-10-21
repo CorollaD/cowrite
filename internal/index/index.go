@@ -32,7 +32,7 @@ func New(ws *workspace.Workspace, db *store.DB, log *slog.Logger) *Index {
 // such as how words are counted or titles cleaned. Unchanged files are
 // normally skipped, so without this an existing post would keep the old
 // numbers until someone happened to edit it.
-const indexVersion = "2"
+const indexVersion = "3"
 
 const settingIndexVersion = "index.version"
 

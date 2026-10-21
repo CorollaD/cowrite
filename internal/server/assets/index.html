@@ -255,6 +255,9 @@
 
   /* ---- Format bar ------------------------------------------------- */
 
+  /* How wide a line of text may run, set from the line-width menu. */
+  body { --measure: 760px; }
+
   /* Shown only while a post is open, and never in focus mode, which exists
      to keep the screen empty. */
   #fmt {
@@ -275,6 +278,13 @@
   #fmt u, #fmt s { font-weight: 600; }
   #fmt select { height: 28px; max-width: 92px; font-size: 12.5px; background-color: var(--panel); }
   #fmtBlock { width: 80px; }
+  #fmt .spacer { flex: 1; min-width: 12px; }
+  #fmt .lbl { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12.5px; margin-right: 4px; white-space: nowrap; }
+  #fmtWidth { width: 72px; }
+  /* A brush under the pointer while the format painter is loaded. */
+  body.painting #rich, body.painting #editor .cm-content {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4-4z'/%3E%3Cpath d='M7 14c-1.7 0-3 1.3-3 3 0 1.3-1.2 2-2 2 1 1.5 2.7 2 4 2a4 4 0 0 0 4-4c0-1.7-1.3-3-3-3z'/%3E%3C/svg%3E") 2 22, copy;
+  }
   .glyph-a { position: relative; font-weight: 700; font-size: 14px; line-height: 1; padding-bottom: 4px; }
   #fmtColorBar {
     position: absolute; left: -2px; right: -2px; bottom: 0; height: 3px;
@@ -317,7 +327,7 @@
     /* Room below the last line so it can be written at eye level. */
     padding: 30px 0 40vh;
   }
-  #editor .cm-content { padding: 0 40px 0 14px; max-width: 840px; caret-color: var(--accent); }
+  #editor .cm-content { padding: 0 40px 0 14px; max-width: calc(var(--measure) + 54px); caret-color: var(--accent); }
   #editor .cm-gutters {
     background: transparent; border: 0;
     color: color-mix(in srgb, var(--muted) 65%, transparent);
@@ -389,7 +399,7 @@
   }
   body.solo #preview { display: none; }
   body.solo #editor { width: 100%; }
-  body.solo #rich, body.rich #rich { padding-inline: max(40px, calc((100cqw - 760px) / 2)); }
+  body.solo #rich, body.rich #rich { padding-inline: max(40px, calc((100cqw - var(--measure)) / 2)); }
   body.rich #preview { display: none; }
   /* The toggle does nothing while the mode itself hides the preview. */
   body.rich #toggle, body.focus #toggle { display: none; }
@@ -438,7 +448,7 @@
     background: transparent; border-bottom-color: transparent;
   }
   body.focus #bar:hover { opacity: 1; background: var(--panel); border-bottom-color: var(--border); }
-  body.focus #editor, body.focus #rich { width: 100%; max-width: 46rem; margin: 0 auto; }
+  body.focus #editor, body.focus #rich { width: 100%; max-width: calc(var(--measure) + 56px); margin: 0 auto; }
   body.focus #editor .cm-scroller { font-size: 17px; line-height: 1.95; padding-top: 7vh; }
   body.focus #editor .cm-content { padding: 0 28px; }
   body.focus #rich { padding: 7vh 28px 40vh; font-size: 17px; line-height: 1.95; }
@@ -646,6 +656,8 @@
     <symbol id="i-codeblock" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="m10 10-2 2 2 2M14 10l2 2-2 2"/></symbol>
     <symbol id="i-table" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 10h18M3 15h18M10 4v16"/></symbol>
     <symbol id="i-eraser" viewBox="0 0 24 24"><path d="m7 21-4.3-4.3a2.4 2.4 0 0 1 0-3.4l9.6-9.6a2.4 2.4 0 0 1 3.4 0l5.6 5.6a2.4 2.4 0 0 1 0 3.4L13 21"/><path d="M22 21H7M5 11l9 9"/></symbol>
+    <symbol id="i-brush" viewBox="0 0 24 24"><path d="M18.4 2.6a2.1 2.1 0 0 1 3 3L12 15l-4-4z"/><path d="M7 14c-1.7 0-3 1.3-3 3 0 1.3-1.2 2-2 2 1 1.5 2.7 2 4 2a4 4 0 0 0 4-4c0-1.7-1.3-3-3-3z"/></symbol>
+    <symbol id="i-width" viewBox="0 0 24 24"><path d="M3 5v14M21 5v14M7 12h10M10 9l-3 3 3 3M14 9l3 3-3 3"/></symbol>
     <symbol id="i-hilite" viewBox="0 0 24 24"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></symbol>
     <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></symbol>
   </svg>
@@ -749,7 +761,16 @@
       <button class="icon" data-fmt="codeblock" title="代码块"><svg class="ico"><use href="#i-codeblock"/></svg></button>
       <button class="icon" data-fmt="table" title="表格"><svg class="ico"><use href="#i-table"/></svg></button>
       <span class="sep"></span>
+      <button class="icon" id="fmtPaint" title="格式刷：单击用一次，双击连续使用，Esc 退出"><svg class="ico"><use href="#i-brush"/></svg></button>
       <button class="icon" data-fmt="clear" title="清除格式"><svg class="ico"><use href="#i-eraser"/></svg></button>
+      <span class="spacer"></span>
+      <label class="lbl" for="fmtWidth" title="行宽"><svg class="ico"><use href="#i-width"/></svg>行宽</label>
+      <select id="fmtWidth" title="行宽">
+        <option value="620px">窄</option>
+        <option value="760px">标准</option>
+        <option value="920px">宽</option>
+        <option value="100vw">全宽</option>
+      </select>
     </div>
     <div id="panes" style="display:none">
       <div id="editor"></div>
@@ -2440,9 +2461,34 @@ skinSel.onchange = () => applySkin(skinSel.value);
 
 // Rich text edits are converted back to markdown before saving, so the
 // file on disk is markdown no matter which mode wrote it.
+// When paragraphs are merged or text is pasted, the browser wraps the text
+// in spans carrying the stylesheet's own values (the theme's text colour, a
+// heading's 1.6em) to keep it looking the same. Saved, they would pin that
+// look onto the text for good, so any declaration that changes nothing on
+// screen is dropped, as is any relative size: the toolbar only sets pixels.
+function richHTMLForSave() {
+  const copy = richEl.cloneNode(true);
+  const live = richEl.querySelectorAll('[style]');
+  const copies = copy.querySelectorAll('[style]');
+  live.forEach((el, i) => {
+    const c = copies[i], parent = getComputedStyle(el.parentElement);
+    let bgEl = el.parentElement;
+    while (bgEl !== richEl && /^(transparent|rgba\(0, 0, 0, 0\))$/.test(getComputedStyle(bgEl).backgroundColor)) {
+      bgEl = bgEl.parentElement;
+    }
+    const s = c.style;
+    if (s.color === parent.color) s.removeProperty('color');
+    if (s.fontFamily === parent.fontFamily) s.removeProperty('font-family');
+    if (/(r?em|%)$/.test(s.fontSize) || s.fontSize === parent.fontSize) s.removeProperty('font-size');
+    if (s.backgroundColor === getComputedStyle(bgEl).backgroundColor) s.removeProperty('background-color');
+    if (!s.length) c.removeAttribute('style');
+  });
+  return copy.innerHTML;
+}
+
 async function syncRichToEditor() {
   if (mode !== 'rich') return;
-  const r = await api('POST', '/to-markdown', { html: richEl.innerHTML });
+  const r = await api('POST', '/to-markdown', { html: richHTMLForSave() });
   if (r.markdown !== editor.value) {
     editor.value = r.markdown;
     dirty = true;
@@ -2456,6 +2502,7 @@ async function showRich() {
 }
 
 async function applyMode(next) {
+  disarmPainter();
   // Carry pending edits across the switch in whichever direction.
   if (mode === 'rich' && next !== 'rich') await syncRichToEditor();
 
@@ -2477,6 +2524,7 @@ async function applyMode(next) {
 modeSel.onchange = () => applyMode(modeSel.value);
 
 richEl.addEventListener('input', () => {
+  dropStylesAddedByEdit();
   dirty = true;
   setStatus('未保存');
   clearTimeout(saveTimer);
@@ -2669,9 +2717,67 @@ function exec(cmd, value = null, css = false) {
   // CSS mode only for the commands that need a span with a style;
   // otherwise bold would come out as <span style="font-weight">, which
   // markdown cannot represent.
+  stylesBeforeEdit = null;
   document.execCommand('styleWithCSS', false, css);
   document.execCommand(cmd, false, value);
   document.execCommand('styleWithCSS', false, false);
+  if (css) moveStylesToSpans();
+}
+
+// On text that is already bold, the browser puts the colour on the <b>
+// itself. Markdown keeps styles only on spans, so they are moved onto one
+// inside the tag.
+function moveStylesToSpans() {
+  const styled = richEl.querySelectorAll(
+    'b[style], strong[style], i[style], em[style], u[style], s[style], strike[style], code[style]');
+  if (!styled.length) return;
+  keepingSelection(() => {
+    for (const el of styled) {
+      const span = document.createElement('span');
+      span.setAttribute('style', el.getAttribute('style'));
+      el.removeAttribute('style');
+      span.append(...el.childNodes);
+      el.append(span);
+    }
+  });
+}
+
+// Moving nodes collapses the selection, and whatever runs next (the
+// format painter's next command, or the person typing) needs it, so it is
+// put back after.
+function keepingSelection(fn) {
+  const sel = getSelection();
+  const ends = sel.rangeCount
+    ? [sel.anchorNode, sel.anchorOffset, sel.focusNode, sel.focusOffset] : null;
+  fn();
+  if (ends && ends[0].isConnected && ends[2].isConnected) sel.setBaseAndExtent(...ends);
+}
+
+// When paragraphs are merged or text is pasted, the browser wraps text in
+// spans that pin the look it had before (a heading's size, the theme's
+// colour). Saved, those would stay on the text for good. Typing, deleting
+// and pasting fire beforeinput while toolbar commands do not, so styles are
+// noted before each such edit, and any style that did not exist anywhere
+// before it is removed after. A copy of an existing style, as when Enter
+// splits red text in two, is left alone.
+let stylesBeforeEdit = null;
+richEl.addEventListener('beforeinput', e => {
+  // Redo brings back a colour on purpose.
+  if (/^(history|format)/.test(e.inputType)) { stylesBeforeEdit = null; return; }
+  stylesBeforeEdit = new Set([...richEl.querySelectorAll('[style]')].map(el => el.getAttribute('style')));
+});
+function dropStylesAddedByEdit() {
+  const before = stylesBeforeEdit;
+  stylesBeforeEdit = null;
+  if (!before) return;
+  const added = [...richEl.querySelectorAll('[style]')].filter(el => !before.has(el.getAttribute('style')));
+  if (!added.length) return;
+  keepingSelection(() => {
+    for (const el of added) {
+      if (el.tagName === 'SPAN') el.replaceWith(...el.childNodes);
+      else el.removeAttribute('style');
+    }
+  });
 }
 
 // The browser has no command for "font size 18px" or "no colour". Each is
@@ -2679,7 +2785,7 @@ function exec(cmd, value = null, css = false) {
 // spans are then rewritten to the real value.
 function applyMarkedStyle(cmd, marker, matches, apply) {
   exec(cmd, marker, true);
-  for (const el of richEl.querySelectorAll('span[style], font')) {
+  for (const el of richEl.querySelectorAll('[style], font')) {
     if (matches(el)) apply(el);
   }
 }
@@ -2837,14 +2943,16 @@ function mdBlock(text, selectFrom = 0, selectLen = 0, replace = false) {
   v.focus();
 }
 
+const stripInline = text => text
+  .replace(/<\/?(span|u|font)\b[^>]*>/g, '')
+  .replace(/(\*\*|__|~~|\*|_|`)(.+?)\1/g, '$2')
+  .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1');
+
 // Removes inline markup and style spans from the selection.
 function mdClear() {
   const v = mdView(), st = v.state, { from, to } = st.selection.main;
   if (from === to) return v.focus();
-  const plain = st.sliceDoc(from, to)
-    .replace(/<\/?(span|u|font)\b[^>]*>/g, '')
-    .replace(/(\*\*|__|~~|\*|_|`)(.+?)\1/g, '$2')
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1');
+  const plain = stripInline(st.sliceDoc(from, to));
   v.dispatch({ changes: { from, to, insert: plain }, selection: { anchor: from, head: from + plain.length } });
   v.focus();
 }
@@ -3006,6 +3114,193 @@ document.addEventListener('mousedown', e => {
   if (!e.target.closest('.palette, #fmtColor, #fmtHilite')) closePalettes();
 });
 addEventListener('resize', closePalettes);
+
+// ---- format painter ----
+
+// The painter copies inline formatting only: what a span of text looks
+// like, not which kind of paragraph it sits in.
+let painter = null; // { fmt, sticky }
+
+const STYLE_KEYS = [['color', 'color'], ['background-color', 'hilite'],
+                    ['font-size', 'size'], ['font-family', 'font']];
+
+function parseStyle(style, into) {
+  for (const decl of style.split(';')) {
+    const [name, ...rest] = decl.split(':');
+    const key = STYLE_KEYS.find(([prop]) => prop === name.trim().toLowerCase());
+    const value = rest.join(':').trim();
+    if (key && value && !(key[1] in into)) into[key[1]] = value;
+  }
+}
+
+function captureRich() {
+  restoreRich();
+  const fmt = {};
+  for (const [name, cmd] of [['bold', 'bold'], ['italic', 'italic'],
+                             ['underline', 'underline'], ['strike', 'strikeThrough']]) {
+    try { fmt[name] = document.queryCommandState(cmd); } catch {}
+  }
+  const start = getSelection().getRangeAt(0).startContainer;
+  // Nearest styled ancestor wins, as it does on screen.
+  for (let el = start.nodeType === Node.TEXT_NODE ? start.parentElement : start;
+       el && el !== richEl; el = el.parentElement) {
+    if (el.tagName === 'CODE') fmt.code = true;
+    if (el.getAttribute('style')) parseStyle(el.getAttribute('style'), fmt);
+    if (el.tagName === 'FONT') {
+      if (el.color && !fmt.color) fmt.color = el.color;
+      if (el.face && !fmt.font) fmt.font = el.face;
+    }
+  }
+  return fmt;
+}
+
+function paintRich(fmt) {
+  const sel = getSelection();
+  if (sel.isCollapsed) {
+    sel.modify('move', 'backward', 'word');
+    sel.modify('extend', 'forward', 'word');
+  }
+  if (sel.isCollapsed) return;
+  exec('removeFormat');
+  // Compare rather than toggle: text in a heading is already bold.
+  for (const [name, cmd] of [['bold', 'bold'], ['italic', 'italic'],
+                             ['underline', 'underline'], ['strike', 'strikeThrough']]) {
+    if (document.queryCommandState(cmd) !== Boolean(fmt[name])) exec(cmd);
+  }
+  for (const [, key] of STYLE_KEYS) if (fmt[key]) rich[key](fmt[key]);
+  if (fmt.code) rich.code();
+  richEl.dispatchEvent(new Event('input'));
+  syncFormatState();
+}
+
+// Finds the inline markup that encloses the selection on its line.
+function captureMd() {
+  const st = mdView().state, { from, to } = st.selection.main;
+  const line = st.doc.lineAt(from);
+  const a = from - line.from, b = Math.min(to, line.to) - line.from;
+  const encloses = (start, end) => a === b ? start < a && a < end : start <= a && b <= end;
+  const fmt = {};
+
+  // Bold is masked out first so its stars are not read as italics.
+  const masked = line.text.replace(/\*\*|__/g, '\u0001\u0001');
+  for (const [name, re, text] of [
+    ['bold', /\u0001\u0001(?!\s).+?\u0001\u0001/g, masked],
+    ['italic', /\*(?![\s*]).*?\*/g, masked],
+    ['strike', /~~.+?~~/g, line.text],
+    ['code', /`[^`]+`/g, line.text],
+  ]) {
+    for (const m of text.matchAll(re)) {
+      if (encloses(m.index, m.index + m[0].length)) fmt[name] = true;
+    }
+  }
+
+  // HTML tags can nest, so they are paired with a stack.
+  const stack = [], found = [];
+  for (const m of line.text.matchAll(/<(\/?)(span|u)\b([^>]*)>/g)) {
+    if (!m[1]) { stack.push({ tag: m[2], attrs: m[3], start: m.index }); continue; }
+    const i = stack.findLastIndex(t => t.tag === m[2]);
+    if (i < 0) continue;
+    const [open] = stack.splice(i, 1);
+    if (encloses(open.start, m.index + m[0].length)) found.push(open);
+  }
+  // Inner tags close first, so they come first and win.
+  for (const t of found) {
+    if (t.tag === 'u') fmt.underline = true;
+    const style = t.attrs.match(/style="([^"]*)"/);
+    if (style) parseStyle(style[1], fmt);
+  }
+  return fmt;
+}
+
+const MD_PAIRS = [['**', '**'], ['~~', '~~'], ['`', '`'], ['*', '*'], ['<u>', '</u>']];
+
+function paintMd(fmt) {
+  const v = mdView(), st = v.state;
+  let { from, to } = st.selection.main;
+  if (from === to) {
+    const word = st.wordAt(from);
+    if (!word) return;
+    ({ from, to } = word);
+  }
+  // Take in markup hugging the selection, so painting plain text over
+  // bold text replaces the bold instead of sitting inside it.
+  for (let grew = true; grew;) {
+    grew = false;
+    const before = st.sliceDoc(Math.max(0, from - 200), from), after = st.sliceDoc(to, to + 10);
+    const span = before.match(/<span style="[^"]*">$/);
+    if (span && after.startsWith('</span>')) {
+      from -= span[0].length; to += 7; grew = true; continue;
+    }
+    for (const [open, close] of MD_PAIRS) {
+      if (before.endsWith(open) && after.startsWith(close)) {
+        from -= open.length; to += close.length; grew = true; break;
+      }
+    }
+  }
+
+  let text = stripInline(st.sliceDoc(from, to));
+  if (fmt.code) text = '`' + text + '`';
+  if (fmt.italic) text = '*' + text + '*';
+  if (fmt.bold) text = '**' + text + '**';
+  if (fmt.strike) text = '~~' + text + '~~';
+  if (fmt.underline) text = '<u>' + text + '</u>';
+  const style = STYLE_KEYS
+    .filter(([, key]) => fmt[key])
+    .map(([prop, key]) => `${prop}: ${fmt[key].replaceAll('"', "'")}`)
+    .join('; ');
+  if (style) text = `<span style="${style}">${text}</span>`;
+  v.dispatch({ changes: { from, to, insert: text }, selection: { anchor: from, head: from + text.length } });
+  v.focus();
+}
+
+const paintBtn = $('#fmtPaint');
+
+function armPainter(sticky) {
+  if (!current) return;
+  painter = { fmt: mode === 'rich' ? captureRich() : captureMd(), sticky };
+  paintBtn.classList.add('on');
+  document.body.classList.add('painting');
+}
+
+function disarmPainter() {
+  painter = null;
+  paintBtn.classList.remove('on');
+  document.body.classList.remove('painting');
+}
+
+// A second click within a double-click keeps the painter loaded.
+paintBtn.onclick = e => {
+  if (e.detail >= 2) armPainter(true);
+  else if (painter) disarmPainter();
+  else armPainter(false);
+};
+
+for (const surface of [richEl, $('#editor')]) {
+  surface.addEventListener('mouseup', () => {
+    if (!painter) return;
+    // Let the editor settle the selection the mouse just made.
+    setTimeout(() => {
+      if (!painter) return;
+      if (mode === 'rich') paintRich(painter.fmt);
+      else paintMd(painter.fmt);
+      if (!painter.sticky) disarmPainter();
+    });
+  });
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && painter) disarmPainter();
+});
+
+// ---- line width ----
+
+const fmtWidth = $('#fmtWidth');
+function applyWidth(w) {
+  document.body.style.setProperty('--measure', w);
+  fmtWidth.value = w;
+  localStorage.setItem('cw.width', w);
+}
+fmtWidth.onchange = () => applyWidth(fmtWidth.value);
+applyWidth(localStorage.getItem('cw.width') || '760px');
 
 // Shortcuts the browser does not provide for rich text on its own.
 richEl.addEventListener('keydown', e => {

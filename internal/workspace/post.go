@@ -123,12 +123,16 @@ func DeriveTitle(body string) string {
 var (
 	titleLinkRe   = regexp.MustCompile(`!?\[([^\]]*)\]\([^)]*\)`)
 	titleMarkupRe = regexp.MustCompile("[*_`~]+")
+	// Only the inline tags formatting produces, so a title that mentions
+	// something like <T any> keeps it.
+	titleTagRe = regexp.MustCompile(`(?i)</?(span|u|font|b|i|strong|em|s|strike|mark|sub|sup)\b[^>]*>`)
 )
 
 // PlainTitle strips inline markdown from a line used as a title, so a
-// first line written as **bold** does not carry its asterisks into the
-// post list.
+// first line written as **bold** or in colour does not carry its markup
+// into the post list.
 func PlainTitle(line string) string {
+	line = titleTagRe.ReplaceAllString(line, "")
 	line = titleLinkRe.ReplaceAllString(line, "$1")
 	line = titleMarkupRe.ReplaceAllString(line, "")
 	return strings.TrimSpace(line)

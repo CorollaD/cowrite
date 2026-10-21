@@ -123,10 +123,12 @@ func TestWriteAtomicReplacesContent(t *testing.T) {
 
 func TestDeriveTitleStripsInlineMarkup(t *testing.T) {
 	cases := map[string]string{
-		"**\"去宁化\"真相：不是反宁王**\n\n正文": "\"去宁化\"真相：不是反宁王",
-		"# 用 `go test` 跑测试":         "用 go test 跑测试",
-		"[链接标题](https://x.com) 之后":  "链接标题 之后",
-		"*斜体开头*":                    "斜体开头",
+		"**\"去宁化\"真相：不是反宁王**\n\n正文":                        "\"去宁化\"真相：不是反宁王",
+		"# 用 `go test` 跑测试":                                "用 go test 跑测试",
+		"[链接标题](https://x.com) 之后":                         "链接标题 之后",
+		"*斜体开头*":                                           "斜体开头",
+		"# <span style=\"color: #d0312d\">**红色标题**</span>": "红色标题",
+		"<u>下划线</u> 与 <T any>":                             "下划线 与 <T any>",
 	}
 	for body, want := range cases {
 		if got := DeriveTitle(body); got != want {
